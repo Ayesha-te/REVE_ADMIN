@@ -1,4 +1,4 @@
-import React from 'react';
+import { ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, 
@@ -62,7 +62,7 @@ const Sidebar = () => {
   );
 };
 
-const AdminLayout = ({ children }: { children: React.ReactNode }) => {
+const AdminLayout = ({ children }: { children: ReactNode }) => {
   return (
     <div className="flex h-screen bg-background overflow-hidden">
       <Sidebar />

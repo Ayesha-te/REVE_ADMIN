@@ -13,7 +13,7 @@ const productSchema = z.object({
   name: z.string().min(1, 'Title is required'),
   description: z.string().min(1, 'Description is required'),
   category: z.string().min(1, 'Category is required'),
-  price: z.coerce.number().min(0),
+  price: z.number().min(0),
   images: z.array(z.string()).min(1, 'At least one picture is required'),
   videos: z.array(z.string()).optional(),
   colors: z.array(z.object({ name: z.string(), image: z.string().optional() })).optional(),
@@ -24,7 +24,20 @@ const productSchema = z.object({
   guaranteeInfo: z.string().optional(),
 });
 
-type ProductFormValues = z.infer<typeof productSchema>;
+type ProductFormValues = {
+  name: string;
+  description: string;
+  category: string;
+  price: number;
+  images: string[];
+  videos?: string[];
+  colors?: { name: string; image?: string }[];
+  sizes?: string[];
+  styles?: { name: string; options: string[] }[];
+  deliveryInfo?: string;
+  returnInfo?: string;
+  guaranteeInfo?: string;
+};
 
 const ProductForm = () => {
   const { id } = useParams();
@@ -47,17 +60,17 @@ const ProductForm = () => {
 
   const { fields: imageFields, append: appendImage, remove: removeImage } = useFieldArray({
     control,
-    name: "images" as never
+    name: "images"
   });
 
   const { fields: videoFields, append: appendVideo, remove: removeVideo } = useFieldArray({
     control,
-    name: "videos" as never
+    name: "videos"
   });
 
   const { fields: styleFields, append: appendStyle, remove: removeStyle } = useFieldArray({
     control,
-    name: "styles" as never
+    name: "styles"
   });
 
   const onSubmit = (data: ProductFormValues) => {
@@ -108,7 +121,7 @@ const ProductForm = () => {
               </div>
               <div className="grid gap-2">
                 <label className="text-sm font-medium">Base Price (£) *</label>
-                <Input type="number" {...register('price')} />
+                <Input type="number" {...register('price', { valueAsNumber: true })} />
               </div>
             </div>
           </CardContent>
