@@ -14,8 +14,8 @@ const productSchema = z.object({
   description: z.string().min(1, 'Description is required'),
   category: z.string().min(1, 'Category is required'),
   price: z.number().min(0),
-  images: z.array(z.string()).min(1, 'At least one picture is required'),
-  videos: z.array(z.string()).optional(),
+  images: z.array(z.object({ url: z.string() })).min(1, 'At least one picture is required'),
+  videos: z.array(z.object({ url: z.string() })).optional(),
   colors: z.array(z.object({ name: z.string(), image: z.string().optional() })).optional(),
   sizes: z.array(z.string()).optional(),
   styles: z.array(z.object({ name: z.string(), options: z.array(z.string()) })).optional(),
@@ -29,8 +29,8 @@ type ProductFormValues = {
   description: string;
   category: string;
   price: number;
-  images: string[];
-  videos?: string[];
+  images: { url: string }[];
+  videos?: { url: string }[];
   colors?: { name: string; image?: string }[];
   sizes?: string[];
   styles?: { name: string; options: string[] }[];
@@ -47,7 +47,7 @@ const ProductForm = () => {
   const { register, control, handleSubmit, formState: { errors }, setValue } = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
     defaultValues: {
-      images: [''],
+      images: [{ url: '' }],
       videos: [],
       colors: [],
       sizes: [],
@@ -131,10 +131,10 @@ const ProductForm = () => {
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Media (Images & Videos) *</CardTitle>
             <div className="space-x-2">
-              <Button type="button" variant="outline" size="sm" onClick={() => appendImage('')}>
+              <Button type="button" variant="outline" size="sm" onClick={() => appendImage({ url: '' })}>
                 <Plus className="h-4 w-4 mr-2" /> Add Image
               </Button>
-              <Button type="button" variant="outline" size="sm" onClick={() => appendVideo('')}>
+              <Button type="button" variant="outline" size="sm" onClick={() => appendVideo({ url: '' })}>
                 <Plus className="h-4 w-4 mr-2" /> Add Video
               </Button>
             </div>
@@ -144,7 +144,7 @@ const ProductForm = () => {
               <label className="text-sm font-medium">Images (URLs)</label>
               {imageFields.map((field, index) => (
                 <div key={field.id} className="flex gap-2">
-                  <Input {...register(`images.${index}` as const)} placeholder="https://..." />
+                  <Input {...register(`images.${index}.url` as const)} placeholder="https://..." />
                   {index > 0 && (
                     <Button type="button" variant="ghost" size="icon" onClick={() => removeImage(index)}>
                       <Trash2 className="h-4 w-4 text-destructive" />
@@ -158,7 +158,7 @@ const ProductForm = () => {
               <label className="text-sm font-medium">Videos (URLs)</label>
               {videoFields.map((field, index) => (
                 <div key={field.id} className="flex gap-2">
-                  <Input {...register(`videos.${index}` as const)} placeholder="https://..." />
+                  <Input {...register(`videos.${index}.url` as const)} placeholder="https://..." />
                   <Button type="button" variant="ghost" size="icon" onClick={() => removeVideo(index)}>
                     <Trash2 className="h-4 w-4 text-destructive" />
                   </Button>
