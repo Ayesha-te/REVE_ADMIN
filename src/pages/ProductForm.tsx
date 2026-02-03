@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
-import { Plus, Trash2, Image as ImageIcon, Video, ArrowLeft } from 'lucide-react';
+import { Plus, Trash2, ArrowLeft } from 'lucide-react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { toast } from 'sonner';
 
@@ -31,7 +31,7 @@ const ProductForm = () => {
   const navigate = useNavigate();
   const [useOldPolicy, setUseOldPolicy] = useState(false);
 
-  const { register, control, handleSubmit, formState: { errors }, watch, setValue } = useForm<ProductFormValues>({
+  const { register, control, handleSubmit, formState: { errors }, setValue } = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
     defaultValues: {
       images: [''],

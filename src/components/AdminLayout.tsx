@@ -8,9 +8,7 @@ import {
   Settings, 
   LogOut,
   PlusCircle,
-  Truck,
-  RotateCcw,
-  ShieldCheck
+  Truck
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 
