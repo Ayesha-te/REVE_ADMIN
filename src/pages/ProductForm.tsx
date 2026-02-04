@@ -169,27 +169,65 @@ const ProductForm = () => {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Images (URLs)</label>
+              <label className="text-sm font-medium">Product Images *</label>
               {imageFields.map((field, index) => (
-                <div key={field.id} className="flex gap-2">
-                  <Input {...register(`images.${index}.url` as const)} placeholder="https://..." />
-                  {index > 0 && (
-                    <Button type="button" variant="ghost" size="icon" onClick={() => removeImage(index)}>
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
+                <div key={field.id} className="space-y-2">
+                  <div className="flex gap-2">
+                    <Input 
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onloadend = () => {
+                            setValue(`images.${index}.url`, reader.result as string);
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                      className="cursor-pointer"
+                    />
+                    {index > 0 && (
+                      <Button type="button" variant="ghost" size="icon" onClick={() => removeImage(index)}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    )}
+                  </div>
+                  {field.url && (
+                    <img src={field.url} alt={`Preview ${index + 1}`} className="w-32 h-32 object-cover rounded-md border" />
                   )}
                 </div>
               ))}
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">Videos (URLs)</label>
+              <label className="text-sm font-medium">Product Videos (Optional)</label>
               {videoFields.map((field, index) => (
-                <div key={field.id} className="flex gap-2">
-                  <Input {...register(`videos.${index}.url` as const)} placeholder="https://..." />
-                  <Button type="button" variant="ghost" size="icon" onClick={() => removeVideo(index)}>
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
+                <div key={field.id} className="space-y-2">
+                  <div className="flex gap-2">
+                    <Input 
+                      type="file"
+                      accept="video/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onloadend = () => {
+                            setValue(`videos.${index}.url`, reader.result as string);
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                      className="cursor-pointer"
+                    />
+                    <Button type="button" variant="ghost" size="icon" onClick={() => removeVideo(index)}>
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
+                  {field.url && (
+                    <video src={field.url} controls className="w-64 h-40 rounded-md border" />
+                  )}
                 </div>
               ))}
             </div>
