@@ -14,7 +14,7 @@ import {
 import { cn } from '../lib/utils';
 
 const sidebarLinks = [
-  { name: 'Dashboard', href: '/', icon: LayoutDashboard },
+  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Products', href: '/products', icon: ShoppingBag },
   { name: 'Categories', href: '/categories', icon: Layers },
   { name: 'Orders', href: '/orders', icon: ShoppingCart },
@@ -55,7 +55,13 @@ const Sidebar = () => {
         </nav>
       </div>
       <div className="border-t border-white/10 p-4">
-        <button className="flex w-full items-center rounded-md px-3 py-2 text-sm font-medium text-ivory/70 hover:bg-white/5 hover:text-ivory transition-colors">
+        <button 
+          onClick={() => {
+            localStorage.removeItem('isLoggedIn');
+            window.location.href = '/';
+          }}
+          className="flex w-full items-center rounded-md px-3 py-2 text-sm font-medium text-ivory/70 hover:bg-white/5 hover:text-ivory transition-colors"
+        >
           <LogOut className="mr-3 h-5 w-5 flex-shrink-0" />
           Logout
         </button>
