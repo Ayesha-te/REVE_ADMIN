@@ -6,6 +6,7 @@ import { Input } from '../components/ui/input';
 import { Plus, Trash2, ArrowLeft } from 'lucide-react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { toast } from 'sonner';
+import { useForm, useFieldArray } from 'react-hook-form';
 
 const productSchema = z.object({
   name: z.string().min(1, 'Title is required'),
@@ -168,7 +169,7 @@ const ProductForm = () => {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">Product Images *</label>
-              {imageFields.map((field, index) => (
+              {imageFields.map((field: { id: string; url: string }, index: number) => (
                 <div key={field.id} className="space-y-2">
                   <div className="flex gap-2">
                     <Input 
@@ -201,7 +202,7 @@ const ProductForm = () => {
 
             <div className="space-y-2">
               <label className="text-sm font-medium">Product Videos (Optional)</label>
-              {videoFields.map((field, index) => (
+              {videoFields.map((field: { id: string; url: string }, index: number) => (
                 <div key={field.id} className="space-y-2">
                   <div className="flex gap-2">
                     <Input 
@@ -248,7 +249,7 @@ const ProductForm = () => {
               }} />
             </div>
 
-            {styleFields.map((field, index) => (
+            {styleFields.map((field: { id: string; name: string; options: string[] }, index: number) => (
               <div key={field.id} className="p-4 border rounded-md space-y-4 relative">
                 <Button 
                   type="button" 
