@@ -186,7 +186,7 @@ const ProductForm = () => {
                           reader.readAsDataURL(file);
                         }
                       }}
-                      className="cursor-pointer"
+                      className="cursor-pointer bg-black/5"
                     />
                     {index > 0 && (
                       <Button type="button" variant="ghost" size="icon" onClick={() => removeImage(index)}>

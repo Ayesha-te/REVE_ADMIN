@@ -421,6 +421,7 @@ const Categories = () => {
                 <Input
                   type="file"
                   accept="image/*"
+                  
                   onChange={(e) => {
                     const file = e.target.files?.[0];
                     if (file) {
@@ -431,7 +432,7 @@ const Categories = () => {
                       reader.readAsDataURL(file);
                     }
                   }}
-                  className="cursor-pointer"
+                  className="cursor-pointer bg-black/5"
                 />
                 {subCategoryFormData.imageUrl && (
                   <div className="relative">
@@ -444,7 +445,7 @@ const Categories = () => {
                       type="button"
                       variant="destructive"
                       size="sm"
-                      className="absolute top-2 right-2"
+                      className="absolute top-2 right-2 "
                       onClick={() => setSubCategoryFormData({ ...subCategoryFormData, imageUrl: '' })}
                     >
                       Remove
