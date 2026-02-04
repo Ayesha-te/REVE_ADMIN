@@ -105,7 +105,7 @@ const Reviews = () => {
 
   const handleApprove = (id: string) => {
     setReviews(reviews.map(review => 
-      review.id === id ? { ...review, status: 'approved' as const } : review
+      review.id === id ? { ...review, status: 'approved' } : review
     ));
     toast.success('Review approved successfully');
   };
@@ -114,7 +114,7 @@ const Reviews = () => {
     const review = reviews.find(r => r.id === id);
     const newStatus = review?.status === 'hidden' ? 'pending' : 'hidden';
     setReviews(reviews.map(review => 
-      review.id === id ? { ...review, status: newStatus as const } : review
+      review.id === id ? { ...review, status: newStatus } : review
     ));
     toast.success(newStatus === 'hidden' ? 'Review hidden' : 'Review unhidden');
   };

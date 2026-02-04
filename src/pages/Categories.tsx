@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
-import { Edit, Trash2, Plus, X, ChevronDown, ChevronRight, FolderPlus, Image as ImageIcon } from 'lucide-react';
+import { Edit, Trash2, Plus, X, ChevronDown, ChevronRight, FolderPlus } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Product {
@@ -411,7 +411,7 @@ const Categories = () => {
                 <textarea
                   value={subCategoryFormData.description}
                   onChange={(e) => setSubCategoryFormData({ ...subCategoryFormData, description: e.target.value })}
-                  className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="flex min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   placeholder="Brief description of this subcategory..."
                 />
               </div>
