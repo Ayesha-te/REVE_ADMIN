@@ -5,6 +5,7 @@ import Products from './pages/Products';
 import ProductForm from './pages/ProductForm';
 import Categories from './pages/Categories';
 import Orders from './pages/Orders';
+import Reviews from './pages/Reviews';
 import Policies from './pages/Policies';
 import Settings from './pages/Settings';
 import { Toaster } from 'sonner';
@@ -20,6 +21,7 @@ function App() {
           <Route path="/products/edit/:id" element={<ProductForm />} />
           <Route path="/categories" element={<Categories />} />
           <Route path="/orders" element={<Orders />} />
+          <Route path="/reviews" element={<Reviews />} />
           <Route path="/policies" element={<Policies />} />
           <Route path="/settings" element={<Settings />} />
         </Routes>

@@ -8,7 +8,8 @@ import {
   Settings, 
   LogOut,
   PlusCircle,
-  Truck
+  Truck,
+  Star
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 
@@ -17,6 +18,7 @@ const sidebarLinks = [
   { name: 'Products', href: '/products', icon: ShoppingBag },
   { name: 'Categories', href: '/categories', icon: Layers },
   { name: 'Orders', href: '/orders', icon: ShoppingCart },
+  { name: 'Reviews', href: '/reviews', icon: Star },
   { name: 'Delivery & Returns', href: '/policies', icon: Truck },
   { name: 'Settings', href: '/settings', icon: Settings },
 ];

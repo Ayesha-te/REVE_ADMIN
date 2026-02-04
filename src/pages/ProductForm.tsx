@@ -14,14 +14,16 @@ const productSchema = z.object({
   description: z.string().min(1, 'Description is required'),
   category: z.string().min(1, 'Category is required'),
   price: z.number().min(0),
+  isBestseller: z.boolean().optional(),
+  discountPercentage: z.number().min(0).max(100).optional(),
   images: z.array(z.object({ url: z.string() })).min(1, 'At least one picture is required'),
   videos: z.array(z.object({ url: z.string() })).optional(),
   colors: z.array(z.object({ name: z.string(), image: z.string().optional() })).optional(),
   sizes: z.array(z.string()).optional(),
   styles: z.array(z.object({ name: z.string(), options: z.array(z.string()) })).optional(),
+  features: z.string().optional(),
   deliveryInfo: z.string().optional(),
-  returnInfo: z.string().optional(),
-  guaranteeInfo: z.string().optional(),
+  returnsGuarantee: z.string().optional(),
 });
 
 type ProductFormValues = {
@@ -29,20 +31,21 @@ type ProductFormValues = {
   description: string;
   category: string;
   price: number;
+  isBestseller?: boolean;
+  discountPercentage?: number;
   images: { url: string }[];
   videos?: { url: string }[];
   colors?: { name: string; image?: string }[];
   sizes?: string[];
   styles?: { name: string; options: string[] }[];
+  features?: string;
   deliveryInfo?: string;
-  returnInfo?: string;
-  guaranteeInfo?: string;
+  returnsGuarantee?: string;
 };
 
 const ProductForm = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [useOldPolicy, setUseOldPolicy] = useState(false);
 
   const { register, control, handleSubmit, formState: { errors }, setValue } = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
@@ -52,9 +55,11 @@ const ProductForm = () => {
       colors: [],
       sizes: [],
       styles: [],
+      isBestseller: false,
+      discountPercentage: 0,
+      features: '',
       deliveryInfo: '',
-      returnInfo: '',
-      guaranteeInfo: '',
+      returnsGuarantee: '',
     }
   });
 
@@ -122,6 +127,29 @@ const ProductForm = () => {
               <div className="grid gap-2">
                 <label className="text-sm font-medium">Base Price (£) *</label>
                 <Input type="number" {...register('price', { valueAsNumber: true })} />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex items-center space-x-2">
+                <input 
+                  type="checkbox" 
+                  id="isBestseller" 
+                  {...register('isBestseller')}
+                  className="h-4 w-4 rounded border-gray-300"
+                />
+                <label htmlFor="isBestseller" className="text-sm font-medium cursor-pointer">Mark as Best Seller</label>
+              </div>
+              <div className="grid gap-2">
+                <label className="text-sm font-medium">Discount (%)</label>
+                <Input 
+                  type="number" 
+                  {...register('discountPercentage', { valueAsNumber: true })} 
+                  placeholder="e.g. 20 for Save 20%"
+                  min="0"
+                  max="100"
+                />
+                {errors.discountPercentage && <p className="text-xs text-destructive">{errors.discountPercentage.message}</p>}
               </div>
             </div>
           </CardContent>
@@ -216,46 +244,35 @@ const ProductForm = () => {
 
         <Card>
           <CardHeader>
-            <CardTitle>Policies (Delivery & Returns)</CardTitle>
+            <CardTitle>Product Details</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-center space-x-2 mb-4">
-              <input 
-                type="checkbox" 
-                id="useOld" 
-                checked={useOldPolicy} 
-                onChange={() => {
-                  setUseOldPolicy(!useOldPolicy);
-                  if (!useOldPolicy) {
-                    setValue('deliveryInfo', 'Use store default delivery information.');
-                    setValue('returnInfo', 'Use store default return policy.');
-                    setValue('guaranteeInfo', 'Use store default guarantee info.');
-                  } else {
-                    setValue('deliveryInfo', '');
-                    setValue('returnInfo', '');
-                    setValue('guaranteeInfo', '');
-                  }
-                }}
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">Features</label>
+              <textarea 
+                {...register('features')} 
+                className="flex min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                placeholder="e.g.\n• UK Handcrafted\n• 2 or 4 Drawer Options\n• Premium Fabric Headboard\n• 10-Year Guarantee"
               />
-              <label htmlFor="useOld" className="text-sm font-medium cursor-pointer">Use default store policies</label>
             </div>
 
-            {!useOldPolicy && (
-              <div className="space-y-4">
-                <div className="grid gap-2">
-                  <label className="text-sm font-medium">Delivery Information</label>
-                  <Input {...register('deliveryInfo')} placeholder="Custom delivery details..." />
-                </div>
-                <div className="grid gap-2">
-                  <label className="text-sm font-medium">Return Policy</label>
-                  <Input {...register('returnInfo')} placeholder="Custom return policy..." />
-                </div>
-                <div className="grid gap-2">
-                  <label className="text-sm font-medium">Guarantee Information</label>
-                  <Input {...register('guaranteeInfo')} placeholder="Custom guarantee info..." />
-                </div>
-              </div>
-            )}
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">Delivery Information</label>
+              <textarea 
+                {...register('deliveryInfo')} 
+                className="flex min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                placeholder="e.g.\n• Free delivery on orders over £500\n• Standard delivery: 3-5 working days\n• Premium delivery with room of choice available"
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">Returns & Guarantee</label>
+              <textarea 
+                {...register('returnsGuarantee')} 
+                className="flex min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                placeholder="e.g.\n• 10-year structural guarantee\n• 30-day comfort exchange on mattresses\n• Free returns within 14 days\n• Full refund or exchange available"
+              />
+            </div>
           </CardContent>
         </Card>
 
