@@ -7,7 +7,7 @@ import { Plus, Trash2, ArrowLeft } from 'lucide-react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useEffect, useState } from 'react';
-import { useForm, useFieldArray } from 'react-hook-form';
+import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { apiGet, apiPost, apiPut, apiUpload } from '../lib/api';
 import type { Category, Product, SubCategory } from '../lib/types';
 
@@ -134,7 +134,7 @@ const ProductForm = () => {
           product.original_price && product.price
             ? Math.round(((product.original_price - product.price) / product.original_price) * 100)
             : 0;
-        setValue('discount_percentage', product.discount_percentage || computedDiscount || 0);
+        setValue('discount_percentage', product.discount_percentage ?? computedDiscount ?? 0);
         setValue('delivery_charges', product.delivery_charges || 0);
         setValue('is_bestseller', product.is_bestseller);
         setValue('is_new', product.is_new);
@@ -175,12 +175,17 @@ const ProductForm = () => {
 
   const onSubmit = async (data: ProductFormValues) => {
     try {
+      const discountPercentage =
+        typeof data.discount_percentage === 'number' && !Number.isNaN(data.discount_percentage)
+          ? data.discount_percentage
+          : 0;
       const computedOriginalPrice =
-        data.discount_percentage && data.discount_percentage > 0
-          ? Number((data.price / (1 - data.discount_percentage / 100)).toFixed(2))
+        discountPercentage > 0
+          ? Number((data.price / (1 - discountPercentage / 100)).toFixed(2))
           : null;
       const payload: ProductFormValues = {
         ...data,
+        discount_percentage: discountPercentage,
         original_price: computedOriginalPrice,
         images: (data.images || []).filter((img) => (img.url || '').trim().length > 0),
         videos: (data.videos || []).filter((vid) => (vid.url || '').trim().length > 0),
@@ -309,20 +314,34 @@ const ProductForm = () => {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="flex items-center space-x-2">
-                <input 
-                  type="checkbox" 
-                  id="is_bestseller" 
-                  {...register('is_bestseller')}
-                  className="h-4 w-4 rounded border-gray-300"
+                <Controller
+                  name="is_bestseller"
+                  control={control}
+                  render={({ field }) => (
+                    <input
+                      type="checkbox"
+                      id="is_bestseller"
+                      checked={!!field.value}
+                      onChange={(e) => field.onChange(e.target.checked)}
+                      className="h-4 w-4 rounded border-gray-300"
+                    />
+                  )}
                 />
                 <label htmlFor="is_bestseller" className="text-sm font-medium cursor-pointer">Mark as Best Seller</label>
               </div>
               <div className="flex items-center space-x-2">
-                <input 
-                  type="checkbox" 
-                  id="is_new" 
-                  {...register('is_new')}
-                  className="h-4 w-4 rounded border-gray-300"
+                <Controller
+                  name="is_new"
+                  control={control}
+                  render={({ field }) => (
+                    <input
+                      type="checkbox"
+                      id="is_new"
+                      checked={!!field.value}
+                      onChange={(e) => field.onChange(e.target.checked)}
+                      className="h-4 w-4 rounded border-gray-300"
+                    />
+                  )}
                 />
                 <label htmlFor="is_new" className="text-sm font-medium cursor-pointer">Mark as New</label>
               </div>
