@@ -1,16 +1,39 @@
+import { useEffect, useState } from 'react';
 import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Edit, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { apiDelete, apiGet } from '../lib/api';
+import type { Product } from '../lib/types';
+import { toast } from 'sonner';
 
 const Products = () => {
-  // Mock data for initial UI
-  const products = [
-    { id: '1', name: 'Cambridge Divan Bed', category: 'Divan Beds', price: '£699', stock: 'In Stock' },
-    { id: '2', name: 'Oxford Divan Bed', category: 'Divan Beds', price: '£749', stock: 'In Stock' },
-    { id: '3', name: 'Hampton Oak Bed', category: 'Wooden Beds', price: '£799', stock: 'Out of Stock' },
-  ];
+  const [products, setProducts] = useState<Product[]>([]);
+
+  const loadProducts = async () => {
+    try {
+      const data = await apiGet<Product[]>('/products/');
+      setProducts(data);
+    } catch {
+      toast.error('Failed to load products');
+    }
+  };
+
+  useEffect(() => {
+    loadProducts();
+  }, []);
+
+  const handleDelete = async (id: number) => {
+    if (!confirm('Delete this product?')) return;
+    try {
+      await apiDelete(`/products/${id}/`);
+      toast.success('Product deleted');
+      await loadProducts();
+    } catch {
+      toast.error('Delete failed');
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -42,13 +65,13 @@ const Products = () => {
               {products.map((product) => (
                 <TableRow key={product.id}>
                   <TableCell className="font-medium">{product.name}</TableCell>
-                  <TableCell>{product.category}</TableCell>
-                  <TableCell>{product.price}</TableCell>
+                  <TableCell>{product.category_name || product.category}</TableCell>
+                  <TableCell>£{product.price}</TableCell>
                   <TableCell>
                     <span className={`px-2 py-1 rounded-full text-xs ${
-                      product.stock === 'In Stock' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                      product.in_stock ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
                     }`}>
-                      {product.stock}
+                      {product.in_stock ? 'In Stock' : 'Out of Stock'}
                     </span>
                   </TableCell>
                   <TableCell className="text-right space-x-2">
@@ -57,7 +80,7 @@ const Products = () => {
                         <Edit className="h-4 w-4" />
                       </Button>
                     </Link>
-                    <Button variant="ghost" size="icon" className="text-destructive">
+                    <Button variant="ghost" size="icon" className="text-destructive" onClick={() => handleDelete(product.id)}>
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </TableCell>

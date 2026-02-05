@@ -5,6 +5,7 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { LogIn } from 'lucide-react';
 import { toast } from 'sonner';
+import { apiPost } from '../lib/api';
 
 interface LoginProps {
   onLogin: () => void;
@@ -13,23 +14,36 @@ interface LoginProps {
 const Login = ({ onLogin }: LoginProps) => {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
-    email: '',
+    username: '',
     password: '',
   });
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.email || !formData.password) {
-      toast.error('Please enter both email and password');
+    if (!formData.username || !formData.password) {
+      toast.error('Please enter both username and password');
       return;
     }
 
-    // For now, just simulate login and navigate to dashboard
-    toast.success('Login successful!');
-    localStorage.setItem('isLoggedIn', 'true');
-    onLogin(); // Update parent state
-    navigate('/dashboard');
+    setIsLoading(true);
+    try {
+      const res = await apiPost<{ access: string; refresh: string }>('/login/', {
+        username: formData.username,
+        password: formData.password,
+      });
+      localStorage.setItem('admin_token', res.access);
+      localStorage.setItem('admin_refresh', res.refresh);
+      localStorage.setItem('isLoggedIn', 'true');
+      toast.success('Login successful!');
+      onLogin();
+      navigate('/dashboard');
+    } catch {
+      toast.error('Login failed');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -47,12 +61,11 @@ const Login = ({ onLogin }: LoginProps) => {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700">Email Address</label>
+              <label className="text-sm font-medium text-gray-700">Username</label>
               <Input
-                type="email"
-                placeholder="admin@reve.com"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                placeholder="admin"
+                value={formData.username}
+                onChange={(e) => setFormData({ ...formData, username: e.target.value })}
                 className="h-11"
               />
             </div>
@@ -78,8 +91,8 @@ const Login = ({ onLogin }: LoginProps) => {
               </a>
             </div>
 
-            <Button type="submit" className="w-full h-11 text-base font-medium">
-              Sign In
+            <Button type="submit" className="w-full h-11 text-base font-medium" disabled={isLoading}>
+              {isLoading ? 'Signing In...' : 'Sign In'}
             </Button>
           </form>
 

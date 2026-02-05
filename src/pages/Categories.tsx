@@ -1,98 +1,50 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Edit, Trash2, Plus, X, ChevronDown, ChevronRight, FolderPlus } from 'lucide-react';
 import { toast } from 'sonner';
-
-interface Product {
-  id: string;
-  name: string;
-  price: number;
-  category?: string;
-  subCategory?: string;
-}
-
-interface SubCategory {
-  id: string;
-  name: string;
-  description: string;
-  imageUrl: string;
-  productIds: string[];
-}
-
-interface Category {
-  id: string;
-  name: string;
-  subCategories: SubCategory[];
-}
-
-// Dummy products
-const dummyProducts: Product[] = [
-  { id: 'p1', name: 'Cambridge Divan Bed', price: 599 },
-  { id: 'p2', name: 'Oxford Ottoman Bed', price: 699 },
-  { id: 'p3', name: 'Westminster Mattress', price: 449 },
-  { id: 'p4', name: 'Royal Chesterfield Sofa', price: 1299 },
-  { id: 'p5', name: 'Velvet Wingback Chair', price: 399 },
-  { id: 'p6', name: 'Classic Wooden Wardrobe', price: 799 },
-  { id: 'p7', name: 'Memory Foam Mattress', price: 549 },
-  { id: 'p8', name: 'Storage Divan Set', price: 649 },
-];
+import { apiDelete, apiGet, apiPost, apiPut, apiUpload } from '../lib/api';
+import type { Category, Product, SubCategory } from '../lib/types';
 
 const Categories = () => {
-  const [categories, setCategories] = useState<Category[]>([
-    {
-      id: '1',
-      name: 'Divan Beds',
-      subCategories: [
-        { 
-          id: 's1', 
-          name: 'Storage Divans', 
-          description: 'Divans with built-in storage drawers',
-          imageUrl: 'https://images.unsplash.com/photo-1505693416388-ac5ce068fe85',
-          productIds: ['p1', 'p8'] 
-        },
-        { 
-          id: 's2', 
-          name: 'Ottoman Divans', 
-          description: 'Ottoman style divan beds with lift-up storage',
-          imageUrl: 'https://images.unsplash.com/photo-1540574163026-643ea20ade25',
-          productIds: ['p2'] 
-        },
-      ],
-    },
-    {
-      id: '2',
-      name: 'Mattresses',
-      subCategories: [
-        { 
-          id: 's3', 
-          name: 'Memory Foam', 
-          description: 'Premium memory foam mattresses',
-          imageUrl: 'https://images.unsplash.com/photo-1631049307264-da0ec9d70304',
-          productIds: ['p3', 'p7'] 
-        },
-      ],
-    },
-  ]);
-
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [showSubCategoryModal, setShowSubCategoryModal] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [editingSubCategory, setEditingSubCategory] = useState<SubCategory | null>(null);
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
-  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(['1', '2']));
-  
-  // Form states
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
+  const [expandedCategories, setExpandedCategories] = useState<Set<number>>(new Set());
+  const [isUploading, setIsUploading] = useState(false);
+
   const [categoryName, setCategoryName] = useState('');
   const [subCategoryFormData, setSubCategoryFormData] = useState({
     name: '',
     description: '',
     imageUrl: '',
-    selectedProducts: [] as string[],
+    selectedProducts: [] as number[],
   });
 
-  const toggleCategory = (id: string) => {
+  const loadData = async () => {
+    try {
+      const [categoriesRes, productsRes] = await Promise.all([
+        apiGet<Category[]>('/categories/'),
+        apiGet<Product[]>('/products/'),
+      ]);
+      setCategories(categoriesRes);
+      setProducts(productsRes);
+      setExpandedCategories(new Set(categoriesRes.map((c) => c.id)));
+    } catch {
+      toast.error('Failed to load categories');
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const toggleCategory = (id: number) => {
     const newExpanded = new Set(expandedCategories);
     if (newExpanded.has(id)) {
       newExpanded.delete(id);
@@ -113,15 +65,17 @@ const Categories = () => {
     setShowCategoryModal(true);
   };
 
-  const openSubCategoryModal = (categoryId: string, subCategory?: SubCategory) => {
+  const openSubCategoryModal = (categoryId: number, subCategory?: SubCategory) => {
     setSelectedCategoryId(categoryId);
     if (subCategory) {
       setEditingSubCategory(subCategory);
       setSubCategoryFormData({
         name: subCategory.name,
         description: subCategory.description,
-        imageUrl: subCategory.imageUrl,
-        selectedProducts: subCategory.productIds,
+        imageUrl: subCategory.image,
+        selectedProducts: products
+          .filter((p) => p.subcategory === subCategory.id)
+          .map((p) => p.id),
       });
     } else {
       setEditingSubCategory(null);
@@ -130,112 +84,135 @@ const Categories = () => {
     setShowSubCategoryModal(true);
   };
 
-  const handleSaveCategory = () => {
+  const handleSaveCategory = async () => {
     if (!categoryName.trim()) {
       toast.error('Category name is required');
       return;
     }
-
-    if (editingCategory) {
-      setCategories(categories.map(cat => 
-        cat.id === editingCategory.id 
-          ? { ...cat, name: categoryName }
-          : cat
-      ));
-      toast.success('Category updated successfully');
-    } else {
-      const newCategory: Category = {
-        id: Date.now().toString(),
-        name: categoryName,
-        subCategories: [],
-      };
-      setCategories([...categories, newCategory]);
-      toast.success('Category created successfully');
+    try {
+      if (editingCategory) {
+        await apiPut(`/categories/${editingCategory.id}/`, {
+          ...editingCategory,
+          name: categoryName,
+        });
+        toast.success('Category updated successfully');
+      } else {
+        await apiPost('/categories/', {
+          name: categoryName,
+          slug: categoryName.toLowerCase().replace(/\s+/g, '-'),
+        });
+        toast.success('Category created successfully');
+      }
+      setShowCategoryModal(false);
+      setCategoryName('');
+      await loadData();
+    } catch {
+      toast.error('Failed to save category');
     }
-    setShowCategoryModal(false);
-    setCategoryName('');
   };
 
-  const handleSaveSubCategory = () => {
-    if (!subCategoryFormData.name.trim()) {
+  const handleSaveSubCategory = async () => {
+    if (!subCategoryFormData.name.trim() || !selectedCategoryId) {
       toast.error('Subcategory name is required');
       return;
     }
-
-    setCategories(categories.map(cat => {
-      if (cat.id === selectedCategoryId) {
-        if (editingSubCategory) {
-          return {
-            ...cat,
-            subCategories: cat.subCategories.map(sub =>
-              sub.id === editingSubCategory.id
-                ? { 
-                    ...sub, 
-                    name: subCategoryFormData.name,
-                    description: subCategoryFormData.description,
-                    imageUrl: subCategoryFormData.imageUrl,
-                    productIds: subCategoryFormData.selectedProducts
-                  }
-                : sub
-            ),
-          };
-        } else {
-          const newSubCategory: SubCategory = {
-            id: Date.now().toString(),
-            name: subCategoryFormData.name,
-            description: subCategoryFormData.description,
-            imageUrl: subCategoryFormData.imageUrl,
-            productIds: subCategoryFormData.selectedProducts,
-          };
-          return {
-            ...cat,
-            subCategories: [...cat.subCategories, newSubCategory],
-          };
-        }
+    try {
+      let targetSubId = editingSubCategory?.id;
+      if (editingSubCategory) {
+        await apiPut(`/subcategories/${editingSubCategory.id}/`, {
+          ...editingSubCategory,
+          name: subCategoryFormData.name,
+          description: subCategoryFormData.description,
+          image: subCategoryFormData.imageUrl,
+          category: selectedCategoryId,
+        });
+        toast.success('Subcategory updated successfully');
+      } else {
+        const created = await apiPost<SubCategory>('/subcategories/', {
+          name: subCategoryFormData.name,
+          slug: subCategoryFormData.name.toLowerCase().replace(/\s+/g, '-'),
+          description: subCategoryFormData.description,
+          image: subCategoryFormData.imageUrl,
+          category: selectedCategoryId,
+        });
+        targetSubId = created.id;
+        toast.success('Subcategory created successfully');
       }
-      return cat;
-    }));
-    
-    toast.success(editingSubCategory ? 'Subcategory updated successfully' : 'Subcategory created successfully');
-    setShowSubCategoryModal(false);
+
+      if (targetSubId) {
+        await Promise.all(
+          subCategoryFormData.selectedProducts.map((productId) =>
+            apiPut(`/products/${productId}/`, { subcategory: targetSubId })
+          )
+        );
+      }
+      setShowSubCategoryModal(false);
+      await loadData();
+    } catch {
+      toast.error('Failed to save subcategory');
+    }
   };
 
-  const handleDeleteCategory = (id: string) => {
+  const handleDeleteCategory = async (id: number) => {
     if (confirm('Are you sure you want to delete this category? This will also delete all subcategories.')) {
-      setCategories(categories.filter(cat => cat.id !== id));
-      toast.success('Category deleted successfully');
+      try {
+        await apiDelete(`/categories/${id}/`);
+        toast.success('Category deleted successfully');
+        await loadData();
+      } catch {
+        toast.error('Failed to delete category');
+      }
     }
   };
 
-  const handleDeleteSubCategory = (categoryId: string, subCategoryId: string) => {
+  const handleDeleteSubCategory = async (id: number) => {
     if (confirm('Are you sure you want to delete this subcategory?')) {
-      setCategories(categories.map(cat => 
-        cat.id === categoryId 
-          ? { ...cat, subCategories: cat.subCategories.filter(sub => sub.id !== subCategoryId) }
-          : cat
-      ));
-      toast.success('Subcategory deleted successfully');
+      try {
+        await apiDelete(`/subcategories/${id}/`);
+        toast.success('Subcategory deleted successfully');
+        await loadData();
+      } catch {
+        toast.error('Failed to delete subcategory');
+      }
     }
   };
 
-  const toggleProductSelection = (productId: string) => {
-    setSubCategoryFormData(prev => ({
+  const toggleProductSelection = (productId: number) => {
+    setSubCategoryFormData((prev) => ({
       ...prev,
       selectedProducts: prev.selectedProducts.includes(productId)
-        ? prev.selectedProducts.filter(id => id !== productId)
-        : [...prev.selectedProducts, productId]
+        ? prev.selectedProducts.filter((id) => id !== productId)
+        : [...prev.selectedProducts, productId],
     }));
   };
 
-  const getProductNames = (productIds: string[]) => {
-    return dummyProducts
-      .filter(p => productIds.includes(p.id))
-      .map(p => p.name)
+  const getProductNames = (productIds: number[]) => {
+    return products
+      .filter((p) => productIds.includes(p.id))
+      .map((p) => p.name)
       .join(', ');
   };
 
   const getTotalProducts = (category: Category) => {
-    return category.subCategories.reduce((total, sub) => total + sub.productIds.length, 0);
+    return (category.subcategories || []).reduce((total, sub) => {
+      const count = products.filter((p) => p.subcategory === sub.id).length;
+      return total + count;
+    }, 0);
+  };
+
+  const subcategoryProducts = useMemo(() => products, [products]);
+
+  const handleUploadImage = async (file?: File) => {
+    if (!file) return;
+    setIsUploading(true);
+    try {
+      const res = await apiUpload('/uploads/', file);
+      setSubCategoryFormData((prev) => ({ ...prev, imageUrl: res.url }));
+    } catch {
+      toast.error('Upload failed');
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   return (
@@ -272,7 +249,7 @@ const Categories = () => {
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-muted-foreground">
-                    {category.subCategories.length} subcategories • {getTotalProducts(category)} products
+                    {(category.subcategories || []).length} subcategories • {getTotalProducts(category)} products
                   </span>
                   <Button
                     variant="outline"
@@ -299,45 +276,51 @@ const Categories = () => {
                 </div>
               </div>
             </CardHeader>
-            
+
             {expandedCategories.has(category.id) && (
               <CardContent>
-                {category.subCategories.length > 0 ? (
+                {(category.subcategories || []).length > 0 ? (
                   <div className="space-y-3">
-                    {category.subCategories.map((sub) => (
-                      <div key={sub.id} className="flex items-start gap-4 p-4 bg-gray-50 rounded-lg border">
-                        {sub.imageUrl && (
-                          <img 
-                            src={sub.imageUrl} 
-                            alt={sub.name}
-                            className="w-24 h-24 object-cover rounded-md"
-                          />
-                        )}
-                        <div className="flex-1">
-                          <div className="font-medium text-lg">{sub.name}</div>
-                          <p className="text-sm text-muted-foreground mt-1">{sub.description}</p>
-                          <p className="text-xs text-muted-foreground mt-2">
-                            <span className="font-medium">Products ({sub.productIds.length}):</span> {sub.productIds.length > 0 ? getProductNames(sub.productIds) : 'None'}
-                          </p>
+                    {(category.subcategories || []).map((sub) => {
+                      const productIds = products
+                        .filter((p) => p.subcategory === sub.id)
+                        .map((p) => p.id);
+                      return (
+                        <div key={sub.id} className="flex items-start gap-4 p-4 bg-gray-50 rounded-lg border">
+                          {sub.image && (
+                            <img
+                              src={sub.image}
+                              alt={sub.name}
+                              className="w-24 h-24 object-cover rounded-md"
+                            />
+                          )}
+                          <div className="flex-1">
+                            <div className="font-medium text-lg">{sub.name}</div>
+                            <p className="text-sm text-muted-foreground mt-1">{sub.description}</p>
+                            <p className="text-xs text-muted-foreground mt-2">
+                              <span className="font-medium">Products ({productIds.length}):</span>{' '}
+                              {productIds.length > 0 ? getProductNames(productIds) : 'None'}
+                            </p>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => openSubCategoryModal(category.id, sub)}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDeleteSubCategory(sub.id)}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
                         </div>
-                        <div className="flex gap-2">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => openSubCategoryModal(category.id, sub)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleDeleteSubCategory(category.id, sub.id)}
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 ) : (
                   <p className="text-center text-muted-foreground py-8">
@@ -350,7 +333,6 @@ const Categories = () => {
         ))}
       </div>
 
-      {/* Category Modal - Simple name only */}
       {showCategoryModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <Card className="w-full max-w-md">
@@ -384,7 +366,6 @@ const Categories = () => {
         </div>
       )}
 
-      {/* SubCategory Modal - With description, image, and products */}
       {showSubCategoryModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -405,7 +386,7 @@ const Categories = () => {
                   placeholder="e.g. Storage Divans"
                 />
               </div>
-              
+
               <div className="grid gap-2">
                 <label className="text-sm font-medium">Description</label>
                 <textarea
@@ -421,24 +402,17 @@ const Categories = () => {
                 <Input
                   type="file"
                   accept="image/*"
-                  
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      const reader = new FileReader();
-                      reader.onloadend = () => {
-                        setSubCategoryFormData({ ...subCategoryFormData, imageUrl: reader.result as string });
-                      };
-                      reader.readAsDataURL(file);
-                    }
-                  }}
+                  onChange={(e) => handleUploadImage(e.target.files?.[0])}
                   className="cursor-pointer bg-black/5"
                 />
+                {isUploading && (
+                  <p className="text-xs text-muted-foreground">Uploading...</p>
+                )}
                 {subCategoryFormData.imageUrl && (
                   <div className="relative">
-                    <img 
-                      src={subCategoryFormData.imageUrl} 
-                      alt="Preview" 
+                    <img
+                      src={subCategoryFormData.imageUrl}
+                      alt="Preview"
                       className="w-full h-40 object-cover rounded-md border"
                     />
                     <Button
@@ -457,7 +431,7 @@ const Categories = () => {
               <div className="grid gap-2">
                 <label className="text-sm font-medium">Select Products</label>
                 <div className="border rounded-md p-3 max-h-64 overflow-y-auto space-y-2">
-                  {dummyProducts.map((product) => (
+                  {subcategoryProducts.map((product) => (
                     <label key={product.id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded">
                       <input
                         type="checkbox"
