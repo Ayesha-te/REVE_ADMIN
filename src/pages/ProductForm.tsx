@@ -8,22 +8,28 @@ import { useNavigate, useParams, Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useEffect, useState } from 'react';
 import { useForm, useFieldArray, Controller } from 'react-hook-form';
+import type { FieldErrors } from 'react-hook-form';
 import { apiGet, apiPost, apiPut, apiUpload } from '../lib/api';
 import type { Category, Product, SubCategory } from '../lib/types';
 
 const optionalNumber = z.preprocess(
-  (value) => (typeof value === 'number' && Number.isNaN(value) ? undefined : value),
+  (value) => {
+    if (value === '' || value === null || value === undefined) return undefined;
+    const coerced = Number(value);
+    return Number.isNaN(coerced) ? undefined : coerced;
+  },
   z.number().optional()
 );
 
-const productSchema = z
+const createProductSchema = (requireImages: boolean) =>
+  z
   .object({
     name: z.string().min(1, 'Title is required'),
     description: z.string().min(1, 'Description is required'),
-    category: z.number({ invalid_type_error: 'Category is required' }),
-    subcategory: z.number().optional().nullable(),
-    price: z.number().min(0, 'Price must be 0 or more'),
-    original_price: z.number().nullable().optional(),
+    category: z.coerce.number({ invalid_type_error: 'Category is required' }),
+    subcategory: z.coerce.number().optional().nullable(),
+    price: z.coerce.number().min(0, 'Price must be 0 or more'),
+    original_price: z.coerce.number().nullable().optional(),
     discount_percentage: optionalNumber.refine(
       (value) => value === undefined || (value >= 0 && value <= 100),
       'Discount must be between 0 and 100'
@@ -46,6 +52,7 @@ const productSchema = z
     returns_guarantee: z.string().optional(),
   })
   .superRefine((values, ctx) => {
+    if (!requireImages) return;
     const images = (values.images || []).filter((img) => (img.url || '').trim().length > 0);
     if (images.length === 0) {
       ctx.addIssue({
@@ -56,11 +63,13 @@ const productSchema = z
     }
   });
 
-type ProductFormValues = z.infer<typeof productSchema>;
+type ProductFormValues = z.infer<ReturnType<typeof createProductSchema>>;
 
 const ProductForm = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const isEditing = Boolean(id);
+  const productSchema = createProductSchema(!isEditing);
   const [categories, setCategories] = useState<Category[]>([]);
   const [subcategories, setSubcategories] = useState<SubCategory[]>([]);
   const [isUploading, setIsUploading] = useState(false);
@@ -173,6 +182,16 @@ const ProductForm = () => {
     }
   };
 
+  const onInvalid = (formErrors: FieldErrors<ProductFormValues>) => {
+    const firstError =
+      formErrors.name?.message ||
+      formErrors.description?.message ||
+      formErrors.category?.message ||
+      formErrors.price?.message ||
+      formErrors.images?.message;
+    toast.error(firstError ? String(firstError) : 'Please fix the highlighted fields.');
+  };
+
   const onSubmit = async (data: ProductFormValues) => {
     try {
       const discountPercentage =
@@ -197,7 +216,11 @@ const ProductForm = () => {
         returns_guarantee: data.returns_guarantee?.trim() || '',
       };
       if (!payload.images || payload.images.length === 0) {
-        payload.images = [];
+        if (isEditing) {
+          delete (payload as Partial<ProductFormValues>).images;
+        } else {
+          payload.images = [];
+        }
       }
       if (!payload.videos || payload.videos.length === 0) {
         delete (payload as Partial<ProductFormValues>).videos;
@@ -246,7 +269,19 @@ const ProductForm = () => {
         </h2>
       </div>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
+      <form onSubmit={handleSubmit(onSubmit, onInvalid)} className="space-y-8">
+        {Object.keys(errors).length > 0 && (
+          <div className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
+            <p className="font-medium">Please fix the highlighted fields:</p>
+            <ul className="mt-2 list-disc pl-5">
+              {Object.entries(errors).map(([key, value]) => (
+                <li key={key}>
+                  {key}: {String((value as { message?: string })?.message || 'Invalid')}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         <Card>
           <CardHeader>
             <CardTitle>Basic Information</CardTitle>
@@ -268,24 +303,29 @@ const ProductForm = () => {
               {errors.description && <p className="text-xs text-destructive">{errors.description.message}</p>}
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
                 <label className="text-sm font-medium">Category *</label>
                 <select
                   className="h-11 rounded-md border border-input bg-background px-3 text-sm"
-                  {...register('category', { valueAsNumber: true })}
+                  {...register('category', {
+                    setValueAs: (value) => (value === '' ? undefined : Number(value)),
+                  })}
                 >
                   <option value="">Select category</option>
                   {categories.map((cat) => (
                     <option key={cat.id} value={cat.id}>{cat.name}</option>
                   ))}
                 </select>
+                {errors.category && <p className="text-xs text-destructive">{errors.category.message}</p>}
               </div>
               <div className="grid gap-2">
                 <label className="text-sm font-medium">Subcategory</label>
                 <select
                   className="h-11 rounded-md border border-input bg-background px-3 text-sm"
-                  {...register('subcategory', { valueAsNumber: true })}
+                  {...register('subcategory', {
+                    setValueAs: (value) => (value === '' ? null : Number(value)),
+                  })}
                 >
                   <option value="">None</option>
                   {availableSubcategories.map((sub) => (
@@ -299,6 +339,7 @@ const ProductForm = () => {
               <div className="grid gap-2">
                 <label className="text-sm font-medium">Price (£) *</label>
                 <Input type="number" {...register('price', { valueAsNumber: true })} />
+                {errors.price && <p className="text-xs text-destructive">{errors.price.message}</p>}
               </div>
               <div className="grid gap-2">
                 <label className="text-sm font-medium">Discount (%)</label>
@@ -408,6 +449,7 @@ const ProductForm = () => {
                   )}
                 </div>
               ))}
+              {errors.images && <p className="text-xs text-destructive">{errors.images.message}</p>}
               {isUploading && <p className="text-xs text-muted-foreground">Uploading...</p>}
             </div>
 
