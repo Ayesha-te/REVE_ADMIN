@@ -86,9 +86,7 @@ const Login = ({ onLogin }: LoginProps) => {
                 <input type="checkbox" className="h-4 w-4 rounded border-gray-300" />
                 <span className="text-gray-600">Remember me</span>
               </label>
-              <a href="#" className="text-primary hover:underline">
-                Forgot password?
-              </a>
+             
             </div>
 
             <Button type="submit" className="w-full h-11 text-base font-medium" disabled={isLoading}>
@@ -97,9 +95,7 @@ const Login = ({ onLogin }: LoginProps) => {
           </form>
 
           <div className="mt-6 text-center">
-            <p className="text-sm text-muted-foreground">
-              Demo credentials: any email & password
-            </p>
+          
           </div>
         </CardContent>
       </Card>
