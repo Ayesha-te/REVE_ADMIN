@@ -12,32 +12,16 @@ import type { FieldErrors } from 'react-hook-form';
 import { apiGet, apiPost, apiPut, apiUpload } from '../lib/api';
 import type { Category, Product, SubCategory } from '../lib/types';
 
-const optionalNumber = z.preprocess(
-  (value) => {
-    if (value === '' || value === null || value === undefined) return undefined;
-    const coerced = Number(value);
-    return Number.isNaN(coerced) ? undefined : coerced;
-  },
-  z.number().optional()
-);
-
 const createProductSchema = (requireImages: boolean) =>
-  z
-  .object({
+  z.object({
     name: z.string().min(1, 'Title is required'),
     description: z.string().min(1, 'Description is required'),
-    category: z.coerce.number({ invalid_type_error: 'Category is required' }),
-    subcategory: z.coerce.number().optional().nullable(),
-    price: z.coerce.number().min(0, 'Price must be 0 or more'),
-    original_price: z.coerce.number().nullable().optional(),
-    discount_percentage: optionalNumber.refine(
-      (value) => value === undefined || (value >= 0 && value <= 100),
-      'Discount must be between 0 and 100'
-    ),
-    delivery_charges: optionalNumber.refine(
-      (value) => value === undefined || value >= 0,
-      'Delivery charges must be 0 or more'
-    ),
+    category: z.number().min(1, 'Category is required'),
+    subcategory: z.number().optional().nullable(),
+    price: z.number().min(0, 'Price must be 0 or more'),
+    original_price: z.number().nullable().optional(),
+    discount_percentage: z.number().min(0).max(100).optional().nullable(),
+    delivery_charges: z.number().min(0).optional().nullable(),
     is_bestseller: z.boolean().optional(),
     is_new: z.boolean().optional(),
     images: z.array(z.object({ url: z.string().optional().nullable() })).optional(),
@@ -256,6 +240,13 @@ const ProductForm = () => {
   const featuresValue = (watch('features') || []).join(', ');
   const availableSubcategories = subcategories.filter((s) => s.category === selectedCategory);
 
+  const watchPrice = watch('price');
+  const watchDiscount = watch('discount_percentage');
+  const computedOriginalPriceDisplay =
+    watchPrice && watchDiscount && watchDiscount > 0
+      ? (watchPrice / (1 - watchDiscount / 100)).toFixed(2)
+      : '';
+
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
       <div className="flex items-center space-x-4">
@@ -396,12 +387,8 @@ const ProductForm = () => {
               <div className="grid gap-2">
                 <label className="text-sm font-medium">Original Price (auto)</label>
                 <Input
-                  type="number"
-                  value={
-                    watch('discount_percentage') && watch('discount_percentage') > 0
-                      ? (watch('price') / (1 - watch('discount_percentage') / 100)).toFixed(2)
-                      : ''
-                  }
+                  type="text"
+                  value={computedOriginalPriceDisplay}
                   readOnly
                 />
               </div>
@@ -445,7 +432,7 @@ const ProductForm = () => {
                     )}
                   </div>
                   {watch(`images.${index}.url`) && (
-                    <img src={watch(`images.${index}.url`)} alt={`Preview ${index + 1}`} className="w-32 h-32 object-cover rounded-md border" />
+                    <img src={watch(`images.${index}.url`) || undefined} alt={`Preview ${index + 1}`} className="w-32 h-32 object-cover rounded-md border" />
                   )}
                 </div>
               ))}
@@ -474,7 +461,7 @@ const ProductForm = () => {
                     </Button>
                   </div>
                   {watch(`videos.${index}.url`) && (
-                    <video src={watch(`videos.${index}.url`)} controls className="w-64 h-40 rounded-md border" />
+                    <video src={watch(`videos.${index}.url`) || undefined} controls className="w-64 h-40 rounded-md border" />
                   )}
                 </div>
               ))}
