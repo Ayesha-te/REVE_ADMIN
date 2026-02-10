@@ -39,6 +39,7 @@ export interface ProductVideo {
 export interface ProductColor {
   id?: number;
   name: string;
+  hex_code?: string;
   image?: string;
 }
 

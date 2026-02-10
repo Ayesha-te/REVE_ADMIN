@@ -12,6 +12,19 @@ import type { FieldErrors } from 'react-hook-form';
 import { apiGet, apiPost, apiPut, apiUpload } from '../lib/api';
 import type { Category, Product, SubCategory, FilterType } from '../lib/types';
 
+const COMMON_COLORS = [
+  { name: 'Black', hex: '#000000' },
+  { name: 'White', hex: '#FFFFFF' },
+  { name: 'Blue', hex: '#2563EB' },
+  { name: 'Red', hex: '#DC2626' },
+  { name: 'Green', hex: '#16A34A' },
+  { name: 'Gray', hex: '#6B7280' },
+  { name: 'Brown', hex: '#92400E' },
+  { name: 'Beige', hex: '#D4A574' },
+  { name: 'Navy', hex: '#1E3A8A' },
+  { name: 'Gold', hex: '#D97706' },
+];
+
 const createProductSchema = (requireImages: boolean) =>
   z.object({
     name: z.string().min(1, 'Title is required'),
@@ -26,7 +39,7 @@ const createProductSchema = (requireImages: boolean) =>
     is_new: z.boolean().optional(),
     images: z.array(z.object({ url: z.string().optional().nullable() })).optional(),
     videos: z.array(z.object({ url: z.string().optional().nullable() })).optional(),
-    colors: z.array(z.object({ name: z.string().optional(), image: z.string().optional() })).optional(),
+    colors: z.array(z.object({ name: z.string().optional(), hex_code: z.string().optional() })).optional(),
     sizes: z.array(z.string()).optional(),
     styles: z
       .array(z.object({ name: z.string().optional(), options: z.array(z.string()).optional() }))
@@ -168,7 +181,7 @@ const ProductForm = () => {
         setValue('is_new', product.is_new);
         const images = product.images.map((i) => ({ url: i.url }));
         const videos = product.videos.map((v) => ({ url: v.url }));
-        const colors = product.colors.map((c) => ({ name: c.name, image: c.image }));
+        const colors = product.colors.map((c) => ({ name: c.name, hex_code: c.hex_code || c.image || '#000000' }));
         const styles = product.styles.map((s) => ({ name: s.name, options: s.options }));
         setValue('images', images);
         setValue('videos', videos);
@@ -539,23 +552,56 @@ const ProductForm = () => {
               <label className="text-sm font-medium">Colors</label>
               {colorFields.map((field, index) => (
                 <div key={field.id} className="flex gap-2">
-                  <Input {...register(`colors.${index}.name` as const)} placeholder="Color name" />
-                  <Input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        handleUpload(file, (url) => setValue(`colors.${index}.image`, url));
-                      }
-                    }}
-                  />
+                  <div className="flex-1 space-y-2">
+                    <div className="flex gap-2">
+                      <select
+                        value={
+                          COMMON_COLORS.find(c => c.hex.toLowerCase() === (watch(`colors.${index}.hex_code`) as string)?.toLowerCase())?.name || ''
+                        }
+                        onChange={(e) => {
+                          const selectedColor = COMMON_COLORS.find(c => c.name === e.target.value);
+                          if (selectedColor) {
+                            setValue(`colors.${index}.name`, selectedColor.name);
+                            setValue(`colors.${index}.hex_code`, selectedColor.hex);
+                          }
+                        }}
+                        className="flex-1 px-3 py-2 border rounded-md bg-white text-sm h-10"
+                      >
+                        <option value="">Select common color</option>
+                        {COMMON_COLORS.map((color) => (
+                          <option key={color.name} value={color.name}>
+                            {color.name}
+                          </option>
+                        ))}
+                      </select>
+                      <Input
+                        type="color"
+                        value={watch(`colors.${index}.hex_code`) || '#000000'}
+                        onChange={(e) => {
+                          const name = watch(`colors.${index}.name`);
+                          const commonColor = COMMON_COLORS.find(c => c.hex.toLowerCase() === e.target.value.toLowerCase());
+                          setValue(`colors.${index}.hex_code`, e.target.value);
+                          if (!name && commonColor) {
+                            setValue(`colors.${index}.name`, commonColor.name);
+                          } else if (!name) {
+                            setValue(`colors.${index}.name`, e.target.value);
+                          }
+                        }}
+                        className="w-12 h-10 p-1 rounded-md border cursor-pointer"
+                      />
+                    </div>
+                    <Input
+                      {...register(`colors.${index}.name` as const)}
+                      placeholder="Custom color name (optional)"
+                      className="text-sm"
+                    />
+                  </div>
                   <Button type="button" variant="ghost" size="icon" onClick={() => removeColor(index)}>
                     <Trash2 className="h-4 w-4 text-destructive" />
                   </Button>
                 </div>
               ))}
-              <Button type="button" variant="outline" size="sm" onClick={() => appendColor({ name: '', image: '' })}>
+              <Button type="button" variant="outline" size="sm" onClick={() => appendColor({ name: '', hex_code: '#000000' })}>
                 <Plus className="h-4 w-4 mr-2" /> Add Color
               </Button>
             </div>
