@@ -539,9 +539,9 @@ const ProductForm = () => {
             <div className="grid gap-2">
               <label className="text-sm font-medium">Sizes (Comma separated)</label>
               <Input
-                placeholder="Single, Double, King"
-                value={sizesValue}
-                onChange={(e) => {
+                placeholder="Single, Double, King, Super King"
+                defaultValue={sizesValue}
+                onBlur={(e) => {
                   const sizes = e.target.value.split(',').map(s => s.trim()).filter(Boolean);
                   setValue('sizes', sizes);
                 }}
@@ -625,8 +625,8 @@ const ProductForm = () => {
                   <label className="text-sm font-medium">Options (Comma separated)</label>
                   <Input 
                     placeholder="Option 1, Option 2, Option 3"
-                    value={(watch(`styles.${index}.options`) || []).join(', ')}
-                    onChange={(e) => {
+                    defaultValue={(watch(`styles.${index}.options`) || []).join(', ')}
+                    onBlur={(e) => {
                       const options = e.target.value.split(',').map(o => o.trim()).filter(Boolean);
                       setValue(`styles.${index}.options`, options);
                     }} 
@@ -705,9 +705,9 @@ const ProductForm = () => {
             <div className="grid gap-2">
               <label className="text-sm font-medium">Features (Comma separated)</label>
               <Input
-                placeholder="UK Handcrafted, Premium Fabric"
-                value={featuresValue}
-                onChange={(e) => {
+                placeholder="UK Handcrafted, Premium Fabric, Free Delivery"
+                defaultValue={featuresValue}
+                onBlur={(e) => {
                   const features = e.target.value.split(',').map(f => f.trim()).filter(Boolean);
                   setValue('features', features);
                 }}
