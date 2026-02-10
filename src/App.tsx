@@ -7,6 +7,7 @@ import Products from './pages/Products';
 import ProductForm from './pages/ProductForm';
 import Categories from './pages/Categories';
 import Collections from './pages/Collections';
+import Filters from './pages/Filters';
 import Orders from './pages/Orders';
 import Reviews from './pages/Reviews';
 import Policies from './pages/Policies';
@@ -44,6 +45,7 @@ function App() {
           <Route path="/products/edit/:id" element={<ProductForm />} />
           <Route path="/categories" element={<Categories />} />
           <Route path="/collections" element={<Collections />} />
+          <Route path="/filters" element={<Filters />} />
           <Route path="/orders" element={<Orders />} />
           <Route path="/reviews" element={<Reviews />} />
           <Route path="/policies" element={<Policies />} />

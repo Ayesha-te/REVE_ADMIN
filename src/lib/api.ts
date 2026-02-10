@@ -74,9 +74,13 @@ export const apiUpload = async (path: string, file: File): Promise<{ url: string
   const formData = new FormData();
   formData.append("file", file);
   const token = getAuthToken();
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
   const res = await fetch(`${API_BASE_URL}${path}`, {
     method: "POST",
-    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    headers: headers,
     body: formData,
   });
   if (!res.ok) {

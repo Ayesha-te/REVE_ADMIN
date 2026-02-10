@@ -10,7 +10,8 @@ import {
   LogOut,
   PlusCircle,
   Truck,
-  Star
+  Star,
+  Sliders
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 
@@ -19,6 +20,7 @@ const sidebarLinks = [
   { name: 'Products', href: '/products', icon: ShoppingBag },
   { name: 'Categories', href: '/categories', icon: Layers },
   { name: 'Collections', href: '/collections', icon: Folder },
+  { name: 'Filters', href: '/filters', icon: Sliders },
   { name: 'Orders', href: '/orders', icon: ShoppingCart },
   { name: 'Reviews', href: '/reviews', icon: Star },
   { name: 'Delivery & Returns', href: '/policies', icon: Truck },
@@ -49,7 +51,7 @@ const Sidebar = () => {
                     : 'text-ivory/70 hover:bg-white/5 hover:text-ivory'
                 )}
               >
-                <Icon className="mr-3 h-5 w-5 flex-shrink-0" />
+                <Icon className="mr-3 h-5 w-5 shrink-0" />
                 {link.name}
               </Link>
             );
@@ -64,7 +66,7 @@ const Sidebar = () => {
           }}
           className="flex w-full items-center rounded-md px-3 py-2 text-sm font-medium text-ivory/70 hover:bg-white/5 hover:text-ivory transition-colors"
         >
-          <LogOut className="mr-3 h-5 w-5 flex-shrink-0" />
+          <LogOut className="mr-3 h-5 w-5 shrink-0" />
           Logout
         </button>
       </div>

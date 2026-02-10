@@ -10,7 +10,7 @@ import { useEffect, useState } from 'react';
 import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import type { FieldErrors } from 'react-hook-form';
 import { apiGet, apiPost, apiPut, apiUpload } from '../lib/api';
-import type { Category, Product, SubCategory } from '../lib/types';
+import type { Category, Product, SubCategory, FilterType } from '../lib/types';
 
 const createProductSchema = (requireImages: boolean) =>
   z.object({
@@ -57,6 +57,8 @@ const ProductForm = () => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [subcategories, setSubcategories] = useState<SubCategory[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [categoryFilters, setCategoryFilters] = useState<FilterType[]>([]);
+  const [selectedFilterOptions, setSelectedFilterOptions] = useState<Map<number, number[]>>(new Map());
 
   const { register, control, handleSubmit, formState: { errors }, setValue, watch } = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
@@ -75,6 +77,18 @@ const ProductForm = () => {
       returns_guarantee: '',
     }
   });
+
+  // Define watched values early for use in effects
+  const selectedCategory = watch('category');
+  const sizesValue = (watch('sizes') || []).join(', ');
+  const featuresValue = (watch('features') || []).join(', ');
+  const availableSubcategories = subcategories.filter((s) => s.category === selectedCategory);
+  const watchPrice = watch('price');
+  const watchDiscount = watch('discount_percentage');
+  const computedOriginalPriceDisplay =
+    watchPrice && watchDiscount && watchDiscount > 0
+      ? (watchPrice / (1 - watchDiscount / 100)).toFixed(2)
+      : '';
 
   const { fields: imageFields, append: appendImage, remove: removeImage, replace: replaceImages } = useFieldArray({
     control,
@@ -111,6 +125,27 @@ const ProductForm = () => {
     };
     load();
   }, []);
+
+  // Load filters when category changes
+  useEffect(() => {
+    const loadCategoryFilters = async () => {
+      if (!selectedCategory) {
+        setCategoryFilters([]);
+        return;
+      }
+      try {
+        const category = categories.find(c => c.id === selectedCategory);
+        if (category) {
+          const filters = await apiGet<FilterType[]>(`/categories/${category.slug}/filters/`);
+          setCategoryFilters(filters);
+        }
+      } catch (error) {
+        // No filters for this category
+        setCategoryFilters([]);
+      }
+    };
+    loadCategoryFilters();
+  }, [selectedCategory, categories]);
 
   useEffect(() => {
     const loadProduct = async () => {
@@ -222,30 +257,41 @@ const ProductForm = () => {
         delete (payload as Partial<ProductFormValues>).features;
       }
 
+      let productId: number | string | undefined = id;
       if (id) {
         await apiPut(`/products/${id}/`, payload);
         toast.success('Product updated successfully');
       } else {
-        await apiPost('/products/', payload);
+        const result = await apiPost<{ id: number }>('/products/', payload);
+        productId = result.id;
         toast.success('Product created successfully');
       }
+
+      // Save filter values if any are selected
+      if (selectedFilterOptions.size > 0 && productId) {
+        const filterValuePromises: Promise<any>[] = [];
+        for (const [, optionIds] of selectedFilterOptions) {
+          for (const optionId of optionIds) {
+            filterValuePromises.push(
+              apiPost('/product-filter-values/', {
+                product: productId,
+                filter_option: optionId,
+              }).catch(() => {
+                // Ignore errors for individual filter values
+              })
+            );
+          }
+        }
+        if (filterValuePromises.length > 0) {
+          await Promise.all(filterValuePromises);
+        }
+      }
+
       navigate('/products');
     } catch {
       toast.error('Failed to save product');
     }
   };
-
-  const selectedCategory = watch('category');
-  const sizesValue = (watch('sizes') || []).join(', ');
-  const featuresValue = (watch('features') || []).join(', ');
-  const availableSubcategories = subcategories.filter((s) => s.category === selectedCategory);
-
-  const watchPrice = watch('price');
-  const watchDiscount = watch('discount_percentage');
-  const computedOriginalPriceDisplay =
-    watchPrice && watchDiscount && watchDiscount > 0
-      ? (watchPrice / (1 - watchDiscount / 100)).toFixed(2)
-      : '';
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
@@ -288,7 +334,7 @@ const ProductForm = () => {
               <label className="text-sm font-medium">Description *</label>
               <textarea 
                 {...register('description')} 
-                className="flex min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex min-h-30 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                 placeholder="Detailed product description..."
               />
               {errors.description && <p className="text-xs text-destructive">{errors.description.message}</p>}
@@ -545,6 +591,66 @@ const ProductForm = () => {
           </CardContent>
         </Card>
 
+        {categoryFilters.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Filter Options</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {categoryFilters.map((filterType) => (
+                <div key={filterType.id} className="space-y-3">
+                  <label className="text-sm font-medium">{filterType.name}</label>
+                  <div className="flex flex-wrap gap-2">
+                    {filterType.options.map((option) => (
+                      <label
+                        key={option.id}
+                        className="flex items-center gap-2 cursor-pointer"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={
+                            selectedFilterOptions.get(filterType.id)?.includes(option.id) || false
+                          }
+                          onChange={(e) => {
+                            const current = selectedFilterOptions.get(filterType.id) || [];
+                            if (e.target.checked) {
+                              setSelectedFilterOptions(
+                                new Map(selectedFilterOptions).set(
+                                  filterType.id,
+                                  [...current, option.id]
+                                )
+                              );
+                            } else {
+                              setSelectedFilterOptions(
+                                new Map(selectedFilterOptions).set(
+                                  filterType.id,
+                                  current.filter((id) => id !== option.id)
+                                )
+                              );
+                            }
+                          }}
+                          className="h-4 w-4 rounded border-gray-300"
+                        />
+                        {filterType.display_type === 'color_swatch' && option.color_code ? (
+                          <div className="flex items-center gap-2">
+                            <div
+                              className="w-4 h-4 rounded border border-gray-300"
+                              style={{ backgroundColor: option.color_code }}
+                            />
+                            <span className="text-sm">{option.name}</span>
+                          </div>
+                        ) : (
+                          <span className="text-sm">{option.name}</span>
+                        )}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
+
         <Card>
           <CardHeader>
             <CardTitle>Product Details</CardTitle>
@@ -566,7 +672,7 @@ const ProductForm = () => {
               <label className="text-sm font-medium">Delivery Information</label>
               <textarea 
                 {...register('delivery_info')} 
-                className="flex min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex min-h-30 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               />
             </div>
 
@@ -574,7 +680,7 @@ const ProductForm = () => {
               <label className="text-sm font-medium">Returns & Guarantee</label>
               <textarea 
                 {...register('returns_guarantee')} 
-                className="flex min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex min-h-30 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               />
             </div>
           </CardContent>

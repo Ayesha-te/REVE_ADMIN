@@ -110,3 +110,39 @@ export interface Order {
   created_at: string;
   items: OrderItem[];
 }
+
+export interface FilterOption {
+  id: number;
+  name: string;
+  slug: string;
+  color_code?: string;
+  display_order: number;
+  is_active: boolean;
+  product_count?: number;
+}
+
+export interface FilterType {
+  id: number;
+  name: string;
+  slug: string;
+  display_type: 'checkbox' | 'color_swatch' | 'radio' | 'dropdown';
+  display_order: number;
+  is_active: boolean;
+  is_expanded_by_default: boolean;
+  options: FilterOption[];
+}
+
+export interface CategoryFilter {
+  id: number;
+  category?: number;
+  subcategory?: number;
+  filter_type: number;
+  display_order: number;
+  is_active: boolean;
+}
+
+export interface ProductFilterValue {
+  id: number;
+  product: number;
+  filter_option: number;
+}
