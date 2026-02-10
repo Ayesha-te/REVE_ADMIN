@@ -65,6 +65,14 @@ const createProductSchema = (requireImages: boolean) =>
       )
       .optional(),
     features: z.array(z.string()).optional(),
+    faqs: z
+      .array(
+        z.object({
+          question: z.string().optional(),
+          answer: z.string().optional(),
+        })
+      )
+      .optional(),
     delivery_info: z.string().optional(),
     returns_guarantee: z.string().optional(),
   })
@@ -133,6 +141,7 @@ const ProductForm = () => {
       discount_percentage: 0,
       delivery_charges: 0,
       features: [],
+      faqs: [],
       delivery_info: '',
       returns_guarantee: '',
     }
@@ -173,6 +182,11 @@ const ProductForm = () => {
   const { fields: fabricFields, append: appendFabric, remove: removeFabric, replace: replaceFabrics } = useFieldArray({
     control,
     name: "fabrics"
+  });
+
+  const { fields: faqFields, append: appendFaq, remove: removeFaq, replace: replaceFaqs } = useFieldArray({
+    control,
+    name: "faqs"
   });
 
   useEffect(() => {
@@ -236,17 +250,23 @@ const ProductForm = () => {
         const colors = product.colors.map((c) => ({ name: c.name, hex_code: c.hex_code || c.image || '#000000' }));
         const styles = product.styles.map((s) => ({ name: s.name, options: normalizeStyleOptions(s.options) }));
         const fabrics = (product.fabrics || []).map((f) => ({ name: f.name, image_url: f.image_url }));
+        const faqs = (product.faqs || []).map((faq) => ({
+          question: (faq.question || '').trim(),
+          answer: (faq.answer || '').trim(),
+        }));
         setValue('images', images);
         setValue('videos', videos);
         setValue('colors', colors);
         setValue('sizes', product.sizes.map((s) => s.name));
         setValue('styles', styles);
         setValue('fabrics', fabrics);
+        setValue('faqs', faqs);
         replaceImages(images);
         replaceVideos(videos);
         replaceColors(colors);
         replaceStyles(styles);
         replaceFabrics(fabrics);
+        replaceFaqs(faqs);
         setValue('features', product.features || []);
         setValue('delivery_info', product.delivery_info || '');
         setValue('returns_guarantee', product.returns_guarantee || '');
@@ -255,7 +275,7 @@ const ProductForm = () => {
       }
     };
     loadProduct();
-  }, [id, setValue, replaceImages, replaceVideos, replaceColors, replaceStyles, replaceFabrics]);
+  }, [id, setValue, replaceImages, replaceVideos, replaceColors, replaceStyles, replaceFabrics, replaceFaqs]);
 
   const handleUpload = async (file: File, onSuccess: (url: string) => void) => {
     setIsUploading(true);
@@ -264,6 +284,21 @@ const ProductForm = () => {
       onSuccess(res.url);
     } catch {
       toast.error('Upload failed');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleMultiImageUpload = async (fileList: FileList) => {
+    const files = Array.from(fileList);
+    if (files.length === 0) return;
+    setIsUploading(true);
+    try {
+      const uploaded = await Promise.all(files.map((file) => apiUpload('/uploads/', file)));
+      uploaded.forEach((res) => appendImage({ url: res.url }));
+      toast.success(`${uploaded.length} image${uploaded.length > 1 ? 's' : ''} uploaded`);
+    } catch {
+      toast.error('Some images failed to upload');
     } finally {
       setIsUploading(false);
     }
@@ -315,6 +350,12 @@ const ProductForm = () => {
           }))
           .filter((fabric) => fabric.name.length > 0 && fabric.image_url.length > 0),
         features: (data.features || []).map((f) => f.trim()).filter(Boolean),
+        faqs: (data.faqs || [])
+          .map((faq) => ({
+            question: (faq.question || '').trim(),
+            answer: (faq.answer || '').trim(),
+          }))
+          .filter((faq) => faq.question.length > 0 && faq.answer.length > 0),
         delivery_info: data.delivery_info?.trim() || '',
         returns_guarantee: data.returns_guarantee?.trim() || '',
       };
@@ -342,6 +383,9 @@ const ProductForm = () => {
       }
       if (!payload.features || payload.features.length === 0) {
         delete (payload as Partial<ProductFormValues>).features;
+      }
+      if (!payload.faqs || payload.faqs.length === 0) {
+        delete (payload as Partial<ProductFormValues>).faqs;
       }
 
       let productId: number | string | undefined = id;
@@ -533,6 +577,18 @@ const ProductForm = () => {
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Media (Images & Videos) *</CardTitle>
             <div className="space-x-2">
+              <Input
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={(e) => {
+                  if (e.target.files && e.target.files.length > 0) {
+                    handleMultiImageUpload(e.target.files);
+                    e.target.value = '';
+                  }
+                }}
+                className="inline-flex w-64 cursor-pointer bg-black/5"
+              />
               <Button type="button" variant="outline" size="sm" onClick={() => appendImage({ url: '' })}>
                 <Plus className="h-4 w-4 mr-2" /> Add Image
               </Button>
@@ -873,6 +929,40 @@ const ProductForm = () => {
                   setValue('features', features);
                 }}
               />
+            </div>
+
+            <div className="grid gap-2">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium">FAQs</label>
+                <Button type="button" variant="outline" size="sm" onClick={() => appendFaq({ question: '', answer: '' })}>
+                  <Plus className="h-4 w-4 mr-2" /> Add FAQ
+                </Button>
+              </div>
+              <div className="space-y-2">
+                {faqFields.map((field, index) => (
+                  <div key={field.id} className="grid grid-cols-12 gap-2">
+                    <Input
+                      className="col-span-4"
+                      {...register(`faqs.${index}.question` as const)}
+                      placeholder="Question"
+                    />
+                    <Input
+                      className="col-span-7"
+                      {...register(`faqs.${index}.answer` as const)}
+                      placeholder="Answer"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="col-span-1"
+                      onClick={() => removeFaq(index)}
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
             </div>
 
             <div className="grid gap-2">

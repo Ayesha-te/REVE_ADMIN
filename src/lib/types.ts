@@ -65,6 +65,11 @@ export interface ProductFabric {
   image_url: string;
 }
 
+export interface ProductFaq {
+  question: string;
+  answer: string;
+}
+
 export interface Product {
   id: number;
   name: string;
@@ -79,6 +84,7 @@ export interface Product {
   description: string;
   short_description?: string;
   features: string[];
+  faqs?: ProductFaq[];
   delivery_info?: string;
   returns_guarantee?: string;
   delivery_charges?: number;
