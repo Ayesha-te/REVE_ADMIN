@@ -42,7 +42,27 @@ const createProductSchema = (requireImages: boolean) =>
     colors: z.array(z.object({ name: z.string().optional(), hex_code: z.string().optional() })).optional(),
     sizes: z.array(z.string()).optional(),
     styles: z
-      .array(z.object({ name: z.string().optional(), options: z.array(z.string()).optional() }))
+      .array(
+        z.object({
+          name: z.string().optional(),
+          options: z
+            .array(
+              z.object({
+                label: z.string().optional(),
+                description: z.string().optional(),
+              })
+            )
+            .optional(),
+        })
+      )
+      .optional(),
+    fabrics: z
+      .array(
+        z.object({
+          name: z.string().optional(),
+          image_url: z.string().optional(),
+        })
+      )
       .optional(),
     features: z.array(z.string()).optional(),
     delivery_info: z.string().optional(),
@@ -61,6 +81,32 @@ const createProductSchema = (requireImages: boolean) =>
   });
 
 type ProductFormValues = z.infer<ReturnType<typeof createProductSchema>>;
+
+type StyleOptionInput = { label: string; description: string };
+
+const normalizeStyleOptions = (options: unknown, includeEmpty = false): StyleOptionInput[] => {
+  if (!Array.isArray(options)) return [];
+  return options
+    .map((option) => {
+      if (typeof option === 'string') {
+        const label = option.trim();
+        if (!label) {
+          return includeEmpty ? { label: '', description: '' } : null;
+        }
+        return { label, description: '' };
+      }
+      if (option && typeof option === 'object') {
+        const rawLabel = (option as { label?: unknown; name?: unknown }).label ?? (option as { name?: unknown }).name;
+        const label = typeof rawLabel === 'string' ? rawLabel.trim() : '';
+        const rawDescription = (option as { description?: unknown }).description;
+        const description = typeof rawDescription === 'string' ? rawDescription.trim() : '';
+        if (!label && !includeEmpty) return null;
+        return { label, description };
+      }
+      return null;
+    })
+    .filter((option): option is StyleOptionInput => Boolean(option));
+};
 
 const ProductForm = () => {
   const { id } = useParams();
@@ -81,6 +127,7 @@ const ProductForm = () => {
       colors: [],
       sizes: [],
       styles: [],
+      fabrics: [],
       is_bestseller: false,
       is_new: false,
       discount_percentage: 0,
@@ -121,6 +168,11 @@ const ProductForm = () => {
   const { fields: colorFields, append: appendColor, remove: removeColor, replace: replaceColors } = useFieldArray({
     control,
     name: "colors"
+  });
+
+  const { fields: fabricFields, append: appendFabric, remove: removeFabric, replace: replaceFabrics } = useFieldArray({
+    control,
+    name: "fabrics"
   });
 
   useEffect(() => {
@@ -182,16 +234,19 @@ const ProductForm = () => {
         const images = product.images.map((i) => ({ url: i.url }));
         const videos = product.videos.map((v) => ({ url: v.url }));
         const colors = product.colors.map((c) => ({ name: c.name, hex_code: c.hex_code || c.image || '#000000' }));
-        const styles = product.styles.map((s) => ({ name: s.name, options: s.options }));
+        const styles = product.styles.map((s) => ({ name: s.name, options: normalizeStyleOptions(s.options) }));
+        const fabrics = (product.fabrics || []).map((f) => ({ name: f.name, image_url: f.image_url }));
         setValue('images', images);
         setValue('videos', videos);
         setValue('colors', colors);
         setValue('sizes', product.sizes.map((s) => s.name));
         setValue('styles', styles);
+        setValue('fabrics', fabrics);
         replaceImages(images);
         replaceVideos(videos);
         replaceColors(colors);
         replaceStyles(styles);
+        replaceFabrics(fabrics);
         setValue('features', product.features || []);
         setValue('delivery_info', product.delivery_info || '');
         setValue('returns_guarantee', product.returns_guarantee || '');
@@ -200,7 +255,7 @@ const ProductForm = () => {
       }
     };
     loadProduct();
-  }, [id, setValue]);
+  }, [id, setValue, replaceImages, replaceVideos, replaceColors, replaceStyles, replaceFabrics]);
 
   const handleUpload = async (file: File, onSuccess: (url: string) => void) => {
     setIsUploading(true);
@@ -242,7 +297,23 @@ const ProductForm = () => {
         videos: (data.videos || []).filter((vid) => (vid.url || '').trim().length > 0),
         colors: (data.colors || []).filter((col) => (col.name || '').trim().length > 0),
         sizes: (data.sizes || []).map((s) => s.trim()).filter(Boolean),
-        styles: (data.styles || []).filter((style) => (style.name || '').trim().length > 0),
+        styles: (data.styles || [])
+          .map((style) => ({
+            name: (style.name || '').trim(),
+            options: (style.options || [])
+              .map((option) => ({
+                label: (option.label || '').trim(),
+                description: (option.description || '').trim(),
+              }))
+              .filter((option) => option.label.length > 0),
+          }))
+          .filter((style) => style.name.length > 0),
+        fabrics: (data.fabrics || [])
+          .map((fabric) => ({
+            name: (fabric.name || '').trim(),
+            image_url: (fabric.image_url || '').trim(),
+          }))
+          .filter((fabric) => fabric.name.length > 0 && fabric.image_url.length > 0),
         features: (data.features || []).map((f) => f.trim()).filter(Boolean),
         delivery_info: data.delivery_info?.trim() || '',
         returns_guarantee: data.returns_guarantee?.trim() || '',
@@ -265,6 +336,9 @@ const ProductForm = () => {
       }
       if (!payload.styles || payload.styles.length === 0) {
         delete (payload as Partial<ProductFormValues>).styles;
+      }
+      if (!payload.fabrics || payload.fabrics.length === 0) {
+        delete (payload as Partial<ProductFormValues>).fabrics;
       }
       if (!payload.features || payload.features.length === 0) {
         delete (payload as Partial<ProductFormValues>).features;
@@ -606,6 +680,47 @@ const ProductForm = () => {
               </Button>
             </div>
 
+            <div className="grid gap-2">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium">Fabrics (with image)</label>
+                <Button type="button" variant="outline" size="sm" onClick={() => appendFabric({ name: '', image_url: '' })}>
+                  <Plus className="h-4 w-4 mr-2" /> Add Fabric
+                </Button>
+              </div>
+              {fabricFields.map((field, index) => (
+                <div key={field.id} className="space-y-2 rounded-md border p-3">
+                  <div className="flex gap-2">
+                    <Input
+                      {...register(`fabrics.${index}.name` as const)}
+                      placeholder="Fabric name (e.g. Plush Velvet)"
+                      className="flex-1"
+                    />
+                    <Button type="button" variant="ghost" size="icon" onClick={() => removeFabric(index)}>
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
+                  <Input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        handleUpload(file, (url) => setValue(`fabrics.${index}.image_url`, url));
+                      }
+                    }}
+                    className="cursor-pointer bg-black/5"
+                  />
+                  {watch(`fabrics.${index}.image_url`) && (
+                    <img
+                      src={watch(`fabrics.${index}.image_url`) || undefined}
+                      alt={watch(`fabrics.${index}.name`) || `Fabric ${index + 1}`}
+                      className="h-24 w-24 rounded-md border object-cover"
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
+
             {styleFields.map((field, index) => (
               <div key={field.id} className="p-4 border rounded-md space-y-4 relative">
                 <Button 
@@ -622,15 +737,61 @@ const ProductForm = () => {
                   <Input {...register(`styles.${index}.name` as const)} placeholder="Style group name" />
                 </div>
                 <div className="grid gap-2">
-                  <label className="text-sm font-medium">Options (Comma separated)</label>
-                  <Input 
-                    placeholder="Option 1, Option 2, Option 3"
-                    defaultValue={(watch(`styles.${index}.options`) || []).join(', ')}
-                    onBlur={(e) => {
-                      const options = e.target.value.split(',').map(o => o.trim()).filter(Boolean);
-                      setValue(`styles.${index}.options`, options);
-                    }} 
-                  />
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-medium">Options</label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const current = normalizeStyleOptions(watch(`styles.${index}.options`), true);
+                        setValue(`styles.${index}.options`, [...current, { label: '', description: '' }]);
+                      }}
+                    >
+                      <Plus className="h-4 w-4 mr-2" /> Add Option
+                    </Button>
+                  </div>
+                  <div className="space-y-2">
+                    {normalizeStyleOptions(watch(`styles.${index}.options`), true).map((option, optionIndex) => (
+                      <div key={`${field.id}-option-${optionIndex}`} className="grid grid-cols-12 gap-2">
+                        <Input
+                          className="col-span-4"
+                          placeholder="Option title (e.g. 2 drawers)"
+                          value={option.label}
+                          onChange={(e) => {
+                            const current = normalizeStyleOptions(watch(`styles.${index}.options`), true);
+                            current[optionIndex] = { ...current[optionIndex], label: e.target.value };
+                            setValue(`styles.${index}.options`, current);
+                          }}
+                        />
+                        <Input
+                          className="col-span-7"
+                          placeholder="Description (e.g. choose left or right)"
+                          value={option.description || ''}
+                          onChange={(e) => {
+                            const current = normalizeStyleOptions(watch(`styles.${index}.options`), true);
+                            current[optionIndex] = { ...current[optionIndex], description: e.target.value };
+                            setValue(`styles.${index}.options`, current);
+                          }}
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="col-span-1"
+                          onClick={() => {
+                            const current = normalizeStyleOptions(watch(`styles.${index}.options`), true);
+                            setValue(
+                              `styles.${index}.options`,
+                              current.filter((_, idx) => idx !== optionIndex)
+                            );
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             ))}

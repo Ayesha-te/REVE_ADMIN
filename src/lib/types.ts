@@ -51,7 +51,18 @@ export interface ProductSize {
 export interface ProductStyle {
   id?: number;
   name: string;
-  options: string[];
+  options: ProductStyleOption[] | string[];
+}
+
+export interface ProductStyleOption {
+  label: string;
+  description?: string;
+}
+
+export interface ProductFabric {
+  id?: number;
+  name: string;
+  image_url: string;
 }
 
 export interface Product {
@@ -81,6 +92,7 @@ export interface Product {
   colors: ProductColor[];
   sizes: ProductSize[];
   styles: ProductStyle[];
+  fabrics: ProductFabric[];
 }
 
 export interface OrderItem {
