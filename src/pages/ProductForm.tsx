@@ -155,6 +155,14 @@ type ProductFormValues = z.infer<ReturnType<typeof createProductSchema>>;
 
 type StyleOptionInput = { label: string; description: string; icon_url?: string };
 
+const readFileAsDataUrl = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+
 const normalizeStyleOptions = (options: unknown, includeEmpty = false): StyleOptionInput[] => {
   if (!Array.isArray(options)) return [];
   return (
@@ -350,11 +358,16 @@ const ProductForm = () => {
     loadProduct();
   }, [id, setValue, replaceImages, replaceVideos, replaceColors, replaceSizes, replaceStyles, replaceFabrics, replaceFaqs, replaceDimensions]);
 
-  const handleUpload = async (file: File, onSuccess: (url: string) => void) => {
+  const handleUpload = async (file: File, onSuccess: (url: string) => void, inlineSvgPreferred = false) => {
     setIsUploading(true);
     try {
-      const res = await apiUpload('/uploads/', file);
-      onSuccess(res.url);
+      if (inlineSvgPreferred && file.type === 'image/svg+xml') {
+        const dataUrl = await readFileAsDataUrl(file);
+        onSuccess(dataUrl);
+      } else {
+        const res = await apiUpload('/uploads/', file);
+        onSuccess(res.url);
+      }
     } catch {
       toast.error('Upload failed');
     } finally {
@@ -905,7 +918,7 @@ const ProductForm = () => {
                 <div className="grid gap-2">
                   <label className="text-sm font-medium">Group Icon URL (SVG/PNG)</label>
                   <div className="flex gap-2">
-                    <Input {...register(`styles.${index}.icon_url` as const)} placeholder="https://.../icon.svg" />
+                    <Input {...register(`styles.${index}.icon_url` as const)} placeholder="URL or inline SVG markup" />
                     <Button
                       type="button"
                       variant="outline"
@@ -917,7 +930,7 @@ const ProductForm = () => {
                         fileInput.onchange = async () => {
                           const file = fileInput.files?.[0];
                           if (!file) return;
-                          await handleUpload(file, (url) => setValue(`styles.${index}.icon_url`, url));
+                          await handleUpload(file, (url) => setValue(`styles.${index}.icon_url`, url), true);
                         };
                         fileInput.click();
                       }}
@@ -943,7 +956,7 @@ const ProductForm = () => {
                   </div>
                   <div className="space-y-2">
                     {normalizeStyleOptions(watch(`styles.${index}.options`), true).map((option, optionIndex) => (
-                      <div key={`${field.id}-option-${optionIndex}`} className="grid grid-cols-12 gap-2">
+                      <div key={`${field.id}-option-${optionIndex}`} className="grid grid-cols-12 gap-2 items-start">
                         <Input
                           className="col-span-3"
                           placeholder="Option title (e.g. 2 drawers)"
@@ -966,7 +979,7 @@ const ProductForm = () => {
                         />
                         <Input
                           className="col-span-3"
-                          placeholder="Icon URL"
+                          placeholder="Icon (URL or inline SVG)"
                           value={option.icon_url || ''}
                           onChange={(e) => {
                             const current = normalizeStyleOptions(watch(`styles.${index}.options`), true);
@@ -974,6 +987,29 @@ const ProductForm = () => {
                             setValue(`styles.${index}.options`, current);
                           }}
                         />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="col-span-2"
+                          onClick={async () => {
+                            const fileInput = document.createElement('input');
+                            fileInput.type = 'file';
+                            fileInput.accept = 'image/svg+xml,image/png,image/*';
+                            fileInput.onchange = async () => {
+                              const file = fileInput.files?.[0];
+                              if (!file) return;
+                              const current = normalizeStyleOptions(watch(`styles.${index}.options`), true);
+                              await handleUpload(file, (url) => {
+                                current[optionIndex] = { ...current[optionIndex], icon_url: url };
+                                setValue(`styles.${index}.options`, current);
+                              }, true);
+                            };
+                            fileInput.click();
+                          }}
+                        >
+                          Upload
+                        </Button>
                         <Button
                           type="button"
                           variant="ghost"
