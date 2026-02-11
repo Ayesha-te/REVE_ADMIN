@@ -28,7 +28,8 @@ const COMMON_COLORS = [
 const createProductSchema = (requireImages: boolean) =>
   z.object({
     name: z.string().min(1, 'Title is required'),
-    description: z.string().min(1, 'Description is required'),
+    short_description: z.string().min(1, 'Short description is required'),
+    description: z.string().min(1, 'Long description is required'),
     category: z.number().min(1, 'Category is required'),
     subcategory: z.number().optional().nullable(),
     price: z.number().min(0, 'Price must be 0 or more'),
@@ -130,6 +131,7 @@ const ProductForm = () => {
   const { register, control, handleSubmit, formState: { errors }, setValue, watch } = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
     defaultValues: {
+      short_description: '',
       images: [],
       videos: [],
       colors: [],
@@ -232,6 +234,7 @@ const ProductForm = () => {
       try {
         const product = await apiGet<Product>(`/products/${id}/`);
         setValue('name', product.name);
+        setValue('short_description', product.short_description || (product.description || '').split('. ')[0] || '');
         setValue('description', product.description);
         setValue('category', product.category);
         setValue('subcategory', product.subcategory || null);
@@ -307,6 +310,7 @@ const ProductForm = () => {
   const onInvalid = (formErrors: FieldErrors<ProductFormValues>) => {
     const firstError =
       formErrors.name?.message ||
+      formErrors.short_description?.message ||
       formErrors.description?.message ||
       formErrors.category?.message ||
       formErrors.price?.message ||
@@ -326,6 +330,8 @@ const ProductForm = () => {
           : null;
       const payload: ProductFormValues = {
         ...data,
+        short_description: data.short_description.trim(),
+        description: data.description.trim(),
         discount_percentage: discountPercentage,
         original_price: computedOriginalPrice,
         images: (data.images || []).filter((img) => (img.url || '').trim().length > 0),
@@ -462,11 +468,21 @@ const ProductForm = () => {
             </div>
             
             <div className="grid gap-2">
-              <label className="text-sm font-medium">Description *</label>
+              <label className="text-sm font-medium">Short Description *</label>
+              <textarea 
+                {...register('short_description')} 
+                className="flex min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                placeholder="Short summary shown under product name..."
+              />
+              {errors.short_description && <p className="text-xs text-destructive">{errors.short_description.message}</p>}
+            </div>
+
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">Long Description *</label>
               <textarea 
                 {...register('description')} 
                 className="flex min-h-30 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                placeholder="Detailed product description..."
+                placeholder="Full detailed description shown at the bottom..."
               />
               {errors.description && <p className="text-xs text-destructive">{errors.description.message}</p>}
             </div>
