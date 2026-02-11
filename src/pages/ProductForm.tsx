@@ -155,13 +155,21 @@ type ProductFormValues = z.infer<ReturnType<typeof createProductSchema>>;
 
 type StyleOptionInput = { label: string; description: string; icon_url?: string };
 
-const readFileAsDataUrl = (file: File): Promise<string> =>
+const readFileAsText = (file: File): Promise<string> =>
   new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(String(reader.result));
     reader.onerror = reject;
-    reader.readAsDataURL(file);
+    reader.readAsText(file);
   });
+
+const minifySvgMarkup = (svg: string): string =>
+  svg
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/\r?\n|\r/g, ' ')
+    .replace(/\s{2,}/g, ' ')
+    .replace(/>\s+</g, '><')
+    .trim();
 
 const normalizeStyleOptions = (options: unknown, includeEmpty = false): StyleOptionInput[] => {
   if (!Array.isArray(options)) return [];
@@ -362,8 +370,8 @@ const ProductForm = () => {
     setIsUploading(true);
     try {
       if (inlineSvgPreferred && file.type === 'image/svg+xml') {
-        const dataUrl = await readFileAsDataUrl(file);
-        onSuccess(dataUrl);
+        const svgText = await readFileAsText(file);
+        onSuccess(minifySvgMarkup(svgText));
       } else {
         const res = await apiUpload('/uploads/', file);
         onSuccess(res.url);
