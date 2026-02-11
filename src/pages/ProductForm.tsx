@@ -12,6 +12,51 @@ import type { FieldErrors } from 'react-hook-form';
 import { apiGet, apiPost, apiPut, apiUpload } from '../lib/api';
 import type { Category, Product, SubCategory, FilterType } from '../lib/types';
 
+const DIMENSION_SIZE_COLUMNS = ['3ft Single', '4ft Small Double', '4ft6 Double', '5ft King', '6ft Super King'];
+
+const DEFAULT_DIMENSION_ROWS = [
+  {
+    measurement: 'Length',
+    values: {
+      '3ft Single': '193 cm (76.0")',
+      '4ft Small Double': '193 cm (76.0")',
+      '4ft6 Double': '193 cm (76.0")',
+      '5ft King': '203 cm (79.9")',
+      '6ft Super King': '203 cm (79.9")',
+    },
+  },
+  {
+    measurement: 'Width',
+    values: {
+      '3ft Single': '90 cm (35.4")',
+      '4ft Small Double': '120 cm (47.2")',
+      '4ft6 Double': '135 cm (53.1")',
+      '5ft King': '150 cm (59.1")',
+      '6ft Super King': '180 cm (70.9")',
+    },
+  },
+  {
+    measurement: 'Headboard Height',
+    values: {
+      '3ft Single': '135 cm (53.1")',
+      '4ft Small Double': '135 cm (53.1")',
+      '4ft6 Double': '135 cm (53.1")',
+      '5ft King': '135 cm (53.1")',
+      '6ft Super King': '135 cm (53.1")',
+    },
+  },
+  {
+    measurement: 'Bed Height',
+    values: {
+      '3ft Single': '35 cm (13.8")',
+      '4ft Small Double': '35 cm (13.8")',
+      '4ft6 Double': '35 cm (13.8")',
+      '5ft King': '35 cm (13.8")',
+      '6ft Super King': '35 cm (13.8")',
+    },
+  },
+];
+
 const COMMON_COLORS = [
   { name: 'Black', hex: '#000000' },
   { name: 'White', hex: '#FFFFFF' },
@@ -41,7 +86,14 @@ const createProductSchema = (requireImages: boolean) =>
     images: z.array(z.object({ url: z.string().optional().nullable() })).optional(),
     videos: z.array(z.object({ url: z.string().optional().nullable() })).optional(),
     colors: z.array(z.object({ name: z.string().optional(), hex_code: z.string().optional() })).optional(),
-    sizes: z.array(z.string()).optional(),
+    sizes: z
+      .array(
+        z.object({
+          name: z.string().optional(),
+          description: z.string().optional(),
+        })
+      )
+      .optional(),
     styles: z
       .array(
         z.object({
@@ -66,6 +118,14 @@ const createProductSchema = (requireImages: boolean) =>
       )
       .optional(),
     features: z.array(z.string()).optional(),
+    dimensions: z
+      .array(
+        z.object({
+          measurement: z.string().optional(),
+          values: z.record(z.string()).optional(),
+        })
+      )
+      .optional(),
     faqs: z
       .array(
         z.object({
@@ -143,6 +203,7 @@ const ProductForm = () => {
       discount_percentage: 0,
       delivery_charges: 0,
       features: [],
+      dimensions: [],
       faqs: [],
       delivery_info: '',
       returns_guarantee: '',
@@ -151,14 +212,17 @@ const ProductForm = () => {
 
   // Define watched values early for use in effects
   const selectedCategory = watch('category');
-  const sizesValue = (watch('sizes') || []).join(', ');
   const featuresValue = (watch('features') || []).join(', ');
   const availableSubcategories = subcategories.filter((s) => s.category === selectedCategory);
   const watchPrice = watch('price');
   const watchDiscount = watch('discount_percentage');
+  const displayDiscountFactor =
+    typeof watchDiscount === 'number' && !Number.isNaN(watchDiscount)
+      ? 1 - watchDiscount / 100
+      : null;
   const computedOriginalPriceDisplay =
-    watchPrice && watchDiscount && watchDiscount > 0
-      ? (watchPrice / (1 - watchDiscount / 100)).toFixed(2)
+    watchPrice && watchDiscount && watchDiscount > 0 && displayDiscountFactor && displayDiscountFactor > 0
+      ? (watchPrice / displayDiscountFactor).toFixed(2)
       : '';
 
   const { fields: imageFields, append: appendImage, remove: removeImage, replace: replaceImages } = useFieldArray({
@@ -176,6 +240,11 @@ const ProductForm = () => {
     name: "styles"
   });
 
+  const { fields: sizeFields, append: appendSize, remove: removeSize, replace: replaceSizes } = useFieldArray({
+    control,
+    name: "sizes"
+  });
+
   const { fields: colorFields, append: appendColor, remove: removeColor, replace: replaceColors } = useFieldArray({
     control,
     name: "colors"
@@ -189,6 +258,16 @@ const ProductForm = () => {
   const { fields: faqFields, append: appendFaq, remove: removeFaq, replace: replaceFaqs } = useFieldArray({
     control,
     name: "faqs"
+  });
+
+  const {
+    fields: dimensionFields,
+    append: appendDimension,
+    remove: removeDimension,
+    replace: replaceDimensions,
+  } = useFieldArray({
+    control,
+    name: "dimensions"
   });
 
   useEffect(() => {
@@ -257,19 +336,27 @@ const ProductForm = () => {
           question: (faq.question || '').trim(),
           answer: (faq.answer || '').trim(),
         }));
+        const dimensions = (product.dimensions || []).map((row) => ({
+          measurement: (row.measurement || '').trim(),
+          values: row.values || {},
+        }));
         setValue('images', images);
         setValue('videos', videos);
         setValue('colors', colors);
-        setValue('sizes', product.sizes.map((s) => s.name));
+        const sizes = product.sizes.map((s) => ({ name: s.name, description: s.description || '' }));
+        setValue('sizes', sizes);
         setValue('styles', styles);
         setValue('fabrics', fabrics);
         setValue('faqs', faqs);
+        setValue('dimensions', dimensions);
         replaceImages(images);
         replaceVideos(videos);
         replaceColors(colors);
+        replaceSizes(sizes);
         replaceStyles(styles);
         replaceFabrics(fabrics);
         replaceFaqs(faqs);
+        replaceDimensions(dimensions);
         setValue('features', product.features || []);
         setValue('delivery_info', product.delivery_info || '');
         setValue('returns_guarantee', product.returns_guarantee || '');
@@ -278,7 +365,7 @@ const ProductForm = () => {
       }
     };
     loadProduct();
-  }, [id, setValue, replaceImages, replaceVideos, replaceColors, replaceStyles, replaceFabrics, replaceFaqs]);
+  }, [id, setValue, replaceImages, replaceVideos, replaceColors, replaceSizes, replaceStyles, replaceFabrics, replaceFaqs, replaceDimensions]);
 
   const handleUpload = async (file: File, onSuccess: (url: string) => void) => {
     setIsUploading(true);
@@ -324,9 +411,14 @@ const ProductForm = () => {
         typeof data.discount_percentage === 'number' && !Number.isNaN(data.discount_percentage)
           ? data.discount_percentage
           : 0;
+      const discountFactor = 1 - discountPercentage / 100;
+      if (discountPercentage >= 100 || discountFactor <= 0) {
+        toast.error('Discount must be less than 100%');
+        return;
+      }
       const computedOriginalPrice =
         discountPercentage > 0
-          ? Number((data.price / (1 - discountPercentage / 100)).toFixed(2))
+          ? Number((data.price / discountFactor).toFixed(2))
           : null;
       const payload: ProductFormValues = {
         ...data,
@@ -337,7 +429,12 @@ const ProductForm = () => {
         images: (data.images || []).filter((img) => (img.url || '').trim().length > 0),
         videos: (data.videos || []).filter((vid) => (vid.url || '').trim().length > 0),
         colors: (data.colors || []).filter((col) => (col.name || '').trim().length > 0),
-        sizes: (data.sizes || []).map((s) => s.trim()).filter(Boolean),
+        sizes: (data.sizes || [])
+          .map((s) => ({
+            name: (s.name || '').trim(),
+            description: (s.description || '').trim(),
+          }))
+          .filter((s) => s.name.length > 0),
         styles: (data.styles || [])
           .map((style) => ({
             name: (style.name || '').trim(),
@@ -356,6 +453,15 @@ const ProductForm = () => {
           }))
           .filter((fabric) => fabric.name.length > 0 && fabric.image_url.length > 0),
         features: (data.features || []).map((f) => f.trim()).filter(Boolean),
+        dimensions: (data.dimensions || [])
+          .map((row) => {
+            const measurement = (row.measurement || '').trim();
+            const values = Object.fromEntries(
+              Object.entries(row.values || {}).map(([key, value]) => [key, String(value || '').trim()])
+            );
+            return { measurement, values };
+          })
+          .filter((row) => row.measurement.length > 0 && Object.values(row.values).some((value) => value.length > 0)),
         faqs: (data.faqs || [])
           .map((faq) => ({
             question: (faq.question || '').trim(),
@@ -389,6 +495,9 @@ const ProductForm = () => {
       }
       if (!payload.features || payload.features.length === 0) {
         delete (payload as Partial<ProductFormValues>).features;
+      }
+      if (!payload.dimensions || payload.dimensions.length === 0) {
+        delete (payload as Partial<ProductFormValues>).dimensions;
       }
       if (!payload.faqs || payload.faqs.length === 0) {
         delete (payload as Partial<ProductFormValues>).faqs;
@@ -532,7 +641,7 @@ const ProductForm = () => {
                   {...register('discount_percentage', { valueAsNumber: true })}
                   placeholder="e.g. 20"
                   min="0"
-                  max="100"
+                  max="99"
                 />
               </div>
             </div>
@@ -683,15 +792,37 @@ const ProductForm = () => {
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="grid gap-2">
-              <label className="text-sm font-medium">Sizes (Comma separated)</label>
-              <Input
-                placeholder="Single, Double, King, Super King"
-                defaultValue={sizesValue}
-                onBlur={(e) => {
-                  const sizes = e.target.value.split(',').map(s => s.trim()).filter(Boolean);
-                  setValue('sizes', sizes);
-                }}
-              />
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium">Sizes</label>
+                <Button type="button" variant="outline" size="sm" onClick={() => appendSize({ name: '', description: '' })}>
+                  <Plus className="h-4 w-4 mr-2" /> Add Size
+                </Button>
+              </div>
+              <div className="space-y-2">
+                {sizeFields.map((field, index) => (
+                  <div key={field.id} className="grid grid-cols-12 gap-2">
+                    <Input
+                      className="col-span-4"
+                      {...register(`sizes.${index}.name` as const)}
+                      placeholder="Size name (e.g. Small Double +90)"
+                    />
+                    <Input
+                      className="col-span-7"
+                      {...register(`sizes.${index}.description` as const)}
+                      placeholder="Size description (optional)"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="col-span-1"
+                      onClick={() => removeSize(index)}
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
             </div>
 
             <div className="grid gap-2">
@@ -945,6 +1076,99 @@ const ProductForm = () => {
                   setValue('features', features);
                 }}
               />
+            </div>
+
+            <div className="grid gap-2">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium">Dimensions Table</label>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      replaceDimensions(
+                        DEFAULT_DIMENSION_ROWS.map((row) => ({
+                          measurement: row.measurement,
+                          values: { ...row.values },
+                        }))
+                      )
+                    }
+                  >
+                    Apply Default Dimensions
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      appendDimension({
+                        measurement: '',
+                        values: Object.fromEntries(DIMENSION_SIZE_COLUMNS.map((size) => [size, ''])),
+                      })
+                    }
+                  >
+                    <Plus className="h-4 w-4 mr-2" /> Add Dimension Row
+                  </Button>
+                </div>
+              </div>
+              <div className="overflow-x-auto rounded-md border">
+                <table className="min-w-full text-sm">
+                  <thead className="bg-muted/60">
+                    <tr>
+                      <th className="p-2 text-left font-medium">Measurement</th>
+                      {DIMENSION_SIZE_COLUMNS.map((size) => (
+                        <th key={size} className="p-2 text-left font-medium">{size}</th>
+                      ))}
+                      <th className="p-2 text-left font-medium">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {dimensionFields.map((field, index) => (
+                      <tr key={field.id} className="border-t">
+                        <td className="p-2 align-top">
+                          <Input
+                            {...register(`dimensions.${index}.measurement` as const)}
+                            placeholder="e.g. Length"
+                          />
+                        </td>
+                        {DIMENSION_SIZE_COLUMNS.map((size) => (
+                          <td key={`${field.id}-${size}`} className="p-2 align-top">
+                            <Controller
+                              control={control}
+                              name={`dimensions.${index}.values.${size}` as any}
+                              render={({ field: dimensionField }) => (
+                                <Input
+                                  value={dimensionField.value || ''}
+                                  onChange={dimensionField.onChange}
+                                  placeholder='e.g. 193 cm (76.0")'
+                                />
+                              )}
+                            />
+                          </td>
+                        ))}
+                        <td className="p-2 align-top">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => removeDimension(index)}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                    {dimensionFields.length === 0 && (
+                      <tr>
+                        <td colSpan={DIMENSION_SIZE_COLUMNS.length + 2} className="p-4 text-center text-muted-foreground">
+                          No dimensions added yet. Click "Apply Default Dimensions" or add rows manually.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
 
             <div className="grid gap-2">

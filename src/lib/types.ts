@@ -46,6 +46,7 @@ export interface ProductColor {
 export interface ProductSize {
   id?: number;
   name: string;
+  description?: string;
 }
 
 export interface ProductStyle {
@@ -70,6 +71,11 @@ export interface ProductFaq {
   answer: string;
 }
 
+export interface ProductDimensionRow {
+  measurement: string;
+  values: Record<string, string>;
+}
+
 export interface Product {
   id: number;
   name: string;
@@ -84,6 +90,7 @@ export interface Product {
   description: string;
   short_description?: string;
   features: string[];
+  dimensions?: ProductDimensionRow[];
   faqs?: ProductFaq[];
   delivery_info?: string;
   returns_guarantee?: string;
