@@ -10,7 +10,7 @@ import { useEffect, useState } from 'react';
 import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import type { FieldErrors } from 'react-hook-form';
 import { apiGet, apiPost, apiPut, apiUpload } from '../lib/api';
-import type { Category, Product, SubCategory, FilterType } from '../lib/types';
+import type { Category, Product, SubCategory } from '../lib/types';
 
 const DIMENSION_SIZE_COLUMNS = ['3ft Single', '4ft Small Double', '4ft6 Double', '5ft King', '6ft Super King'];
 
@@ -98,11 +98,13 @@ const createProductSchema = (requireImages: boolean) =>
       .array(
         z.object({
           name: z.string().optional(),
+          icon_url: z.string().optional(),
           options: z
             .array(
               z.object({
                 label: z.string().optional(),
                 description: z.string().optional(),
+                icon_url: z.string().optional(),
               })
             )
             .optional(),
@@ -122,7 +124,7 @@ const createProductSchema = (requireImages: boolean) =>
       .array(
         z.object({
           measurement: z.string().optional(),
-          values: z.record(z.string()).optional(),
+          values: z.record(z.string(), z.string()).optional(),
         })
       )
       .optional(),
@@ -151,30 +153,34 @@ const createProductSchema = (requireImages: boolean) =>
 
 type ProductFormValues = z.infer<ReturnType<typeof createProductSchema>>;
 
-type StyleOptionInput = { label: string; description: string };
+type StyleOptionInput = { label: string; description: string; icon_url?: string };
 
 const normalizeStyleOptions = (options: unknown, includeEmpty = false): StyleOptionInput[] => {
   if (!Array.isArray(options)) return [];
-  return options
-    .map((option) => {
-      if (typeof option === 'string') {
-        const label = option.trim();
-        if (!label) {
-          return includeEmpty ? { label: '', description: '' } : null;
+  return (
+    options
+      .map((option) => {
+        if (typeof option === 'string') {
+          const label = option.trim();
+          if (!label) {
+            return includeEmpty ? { label: '', description: '', icon_url: '' } : null;
+          }
+          return { label, description: '', icon_url: '' };
         }
-        return { label, description: '' };
-      }
-      if (option && typeof option === 'object') {
-        const rawLabel = (option as { label?: unknown; name?: unknown }).label ?? (option as { name?: unknown }).name;
-        const label = typeof rawLabel === 'string' ? rawLabel.trim() : '';
-        const rawDescription = (option as { description?: unknown }).description;
-        const description = typeof rawDescription === 'string' ? rawDescription.trim() : '';
-        if (!label && !includeEmpty) return null;
-        return { label, description };
-      }
-      return null;
-    })
-    .filter((option): option is StyleOptionInput => Boolean(option));
+        if (option && typeof option === 'object') {
+          const rawLabel = (option as { label?: unknown; name?: unknown }).label ?? (option as { name?: unknown }).name;
+          const label = typeof rawLabel === 'string' ? rawLabel.trim() : '';
+          const rawDescription = (option as { description?: unknown }).description;
+          const description = typeof rawDescription === 'string' ? rawDescription.trim() : '';
+          const rawIcon = (option as { icon_url?: unknown }).icon_url;
+          const icon_url = typeof rawIcon === 'string' ? rawIcon.trim() : '';
+          if (!label && !includeEmpty) return null;
+          return { label, description, icon_url };
+        }
+        return null;
+      })
+      .filter(Boolean) as StyleOptionInput[]
+  );
 };
 
 const ProductForm = () => {
@@ -185,8 +191,6 @@ const ProductForm = () => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [subcategories, setSubcategories] = useState<SubCategory[]>([]);
   const [isUploading, setIsUploading] = useState(false);
-  const [categoryFilters, setCategoryFilters] = useState<FilterType[]>([]);
-  const [selectedFilterOptions, setSelectedFilterOptions] = useState<Map<number, number[]>>(new Map());
 
   const { register, control, handleSubmit, formState: { errors }, setValue, watch } = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
@@ -286,27 +290,6 @@ const ProductForm = () => {
     load();
   }, []);
 
-  // Load filters when category changes
-  useEffect(() => {
-    const loadCategoryFilters = async () => {
-      if (!selectedCategory) {
-        setCategoryFilters([]);
-        return;
-      }
-      try {
-        const category = categories.find(c => c.id === selectedCategory);
-        if (category) {
-          const filters = await apiGet<FilterType[]>(`/categories/${category.slug}/filters/`);
-          setCategoryFilters(filters);
-        }
-      } catch (error) {
-        // No filters for this category
-        setCategoryFilters([]);
-      }
-    };
-    loadCategoryFilters();
-  }, [selectedCategory, categories]);
-
   useEffect(() => {
     const loadProduct = async () => {
       if (!id) return;
@@ -330,7 +313,7 @@ const ProductForm = () => {
         const images = product.images.map((i) => ({ url: i.url }));
         const videos = product.videos.map((v) => ({ url: v.url }));
         const colors = product.colors.map((c) => ({ name: c.name, hex_code: c.hex_code || c.image || '#000000' }));
-        const styles = product.styles.map((s) => ({ name: s.name, options: normalizeStyleOptions(s.options) }));
+        const styles = product.styles.map((s) => ({ name: s.name, icon_url: s.icon_url || '', options: normalizeStyleOptions(s.options) }));
         const fabrics = (product.fabrics || []).map((f) => ({ name: f.name, image_url: f.image_url }));
         const faqs = (product.faqs || []).map((faq) => ({
           question: (faq.question || '').trim(),
@@ -438,10 +421,12 @@ const ProductForm = () => {
         styles: (data.styles || [])
           .map((style) => ({
             name: (style.name || '').trim(),
+            icon_url: (style.icon_url || '').trim(),
             options: (style.options || [])
               .map((option) => ({
                 label: (option.label || '').trim(),
                 description: (option.description || '').trim(),
+                icon_url: (option.icon_url || '').trim(),
               }))
               .filter((option) => option.label.length > 0),
           }))
@@ -503,34 +488,12 @@ const ProductForm = () => {
         delete (payload as Partial<ProductFormValues>).faqs;
       }
 
-      let productId: number | string | undefined = id;
       if (id) {
         await apiPut(`/products/${id}/`, payload);
         toast.success('Product updated successfully');
       } else {
-        const result = await apiPost<{ id: number }>('/products/', payload);
-        productId = result.id;
+        await apiPost<{ id: number }>('/products/', payload);
         toast.success('Product created successfully');
-      }
-
-      // Save filter values if any are selected
-      if (selectedFilterOptions.size > 0 && productId) {
-        const filterValuePromises: Promise<any>[] = [];
-        for (const [, optionIds] of selectedFilterOptions) {
-          for (const optionId of optionIds) {
-            filterValuePromises.push(
-              apiPost('/product-filter-values/', {
-                product: productId,
-                filter_option: optionId,
-              }).catch(() => {
-                // Ignore errors for individual filter values
-              })
-            );
-          }
-        }
-        if (filterValuePromises.length > 0) {
-          await Promise.all(filterValuePromises);
-        }
       }
 
       navigate('/products');
@@ -940,6 +903,30 @@ const ProductForm = () => {
                   <Input {...register(`styles.${index}.name` as const)} placeholder="Style group name" />
                 </div>
                 <div className="grid gap-2">
+                  <label className="text-sm font-medium">Group Icon URL (SVG/PNG)</label>
+                  <div className="flex gap-2">
+                    <Input {...register(`styles.${index}.icon_url` as const)} placeholder="https://.../icon.svg" />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={async () => {
+                        const fileInput = document.createElement('input');
+                        fileInput.type = 'file';
+                        fileInput.accept = 'image/svg+xml,image/png,image/*';
+                        fileInput.onchange = async () => {
+                          const file = fileInput.files?.[0];
+                          if (!file) return;
+                          await handleUpload(file, (url) => setValue(`styles.${index}.icon_url`, url));
+                        };
+                        fileInput.click();
+                      }}
+                    >
+                      Upload
+                    </Button>
+                  </div>
+                </div>
+                <div className="grid gap-2">
                   <div className="flex items-center justify-between">
                     <label className="text-sm font-medium">Options</label>
                     <Button
@@ -948,7 +935,7 @@ const ProductForm = () => {
                       size="sm"
                       onClick={() => {
                         const current = normalizeStyleOptions(watch(`styles.${index}.options`), true);
-                        setValue(`styles.${index}.options`, [...current, { label: '', description: '' }]);
+                        setValue(`styles.${index}.options`, [...current, { label: '', description: '', icon_url: '' }]);
                       }}
                     >
                       <Plus className="h-4 w-4 mr-2" /> Add Option
@@ -958,7 +945,7 @@ const ProductForm = () => {
                     {normalizeStyleOptions(watch(`styles.${index}.options`), true).map((option, optionIndex) => (
                       <div key={`${field.id}-option-${optionIndex}`} className="grid grid-cols-12 gap-2">
                         <Input
-                          className="col-span-4"
+                          className="col-span-3"
                           placeholder="Option title (e.g. 2 drawers)"
                           value={option.label}
                           onChange={(e) => {
@@ -968,12 +955,22 @@ const ProductForm = () => {
                           }}
                         />
                         <Input
-                          className="col-span-7"
+                          className="col-span-5"
                           placeholder="Description (e.g. choose left or right)"
                           value={option.description || ''}
                           onChange={(e) => {
                             const current = normalizeStyleOptions(watch(`styles.${index}.options`), true);
                             current[optionIndex] = { ...current[optionIndex], description: e.target.value };
+                            setValue(`styles.${index}.options`, current);
+                          }}
+                        />
+                        <Input
+                          className="col-span-3"
+                          placeholder="Icon URL"
+                          value={option.icon_url || ''}
+                          onChange={(e) => {
+                            const current = normalizeStyleOptions(watch(`styles.${index}.options`), true);
+                            current[optionIndex] = { ...current[optionIndex], icon_url: e.target.value };
                             setValue(`styles.${index}.options`, current);
                           }}
                         />
@@ -1000,66 +997,6 @@ const ProductForm = () => {
             ))}
           </CardContent>
         </Card>
-
-        {categoryFilters.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Filter Options</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {categoryFilters.map((filterType) => (
-                <div key={filterType.id} className="space-y-3">
-                  <label className="text-sm font-medium">{filterType.name}</label>
-                  <div className="flex flex-wrap gap-2">
-                    {filterType.options.map((option) => (
-                      <label
-                        key={option.id}
-                        className="flex items-center gap-2 cursor-pointer"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={
-                            selectedFilterOptions.get(filterType.id)?.includes(option.id) || false
-                          }
-                          onChange={(e) => {
-                            const current = selectedFilterOptions.get(filterType.id) || [];
-                            if (e.target.checked) {
-                              setSelectedFilterOptions(
-                                new Map(selectedFilterOptions).set(
-                                  filterType.id,
-                                  [...current, option.id]
-                                )
-                              );
-                            } else {
-                              setSelectedFilterOptions(
-                                new Map(selectedFilterOptions).set(
-                                  filterType.id,
-                                  current.filter((id) => id !== option.id)
-                                )
-                              );
-                            }
-                          }}
-                          className="h-4 w-4 rounded border-gray-300"
-                        />
-                        {filterType.display_type === 'color_swatch' && option.color_code ? (
-                          <div className="flex items-center gap-2">
-                            <div
-                              className="w-4 h-4 rounded border border-gray-300"
-                              style={{ backgroundColor: option.color_code }}
-                            />
-                            <span className="text-sm">{option.name}</span>
-                          </div>
-                        ) : (
-                          <span className="text-sm">{option.name}</span>
-                        )}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        )}
 
         <Card>
           <CardHeader>
