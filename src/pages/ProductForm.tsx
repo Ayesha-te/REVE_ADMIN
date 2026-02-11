@@ -154,6 +154,8 @@ const createProductSchema = (requireImages: boolean) =>
 type ProductFormValues = z.infer<ReturnType<typeof createProductSchema>>;
 
 type StyleOptionInput = { label: string; description: string; icon_url?: string };
+const MAX_INLINE_SVG_CHARS = 50000;
+const MAX_PRODUCT_PAYLOAD_BYTES = 2500000;
 
 const readFileAsText = (file: File): Promise<string> =>
   new Promise((resolve, reject) => {
@@ -371,7 +373,15 @@ const ProductForm = () => {
     try {
       if (inlineSvgPreferred && file.type === 'image/svg+xml') {
         const svgText = await readFileAsText(file);
-        onSuccess(minifySvgMarkup(svgText));
+        const minifiedSvg = minifySvgMarkup(svgText);
+        const hasEmbeddedDataImage = /<image[\s\S]+?(href|xlink:href)\s*=\s*["']data:image\//i.test(minifiedSvg);
+        if (minifiedSvg.length > MAX_INLINE_SVG_CHARS || hasEmbeddedDataImage) {
+          const res = await apiUpload('/uploads/', file);
+          onSuccess(res.url);
+          toast.info('Large SVG stored as uploaded file to keep product payload small.');
+        } else {
+          onSuccess(minifiedSvg);
+        }
       } else {
         const res = await apiUpload('/uploads/', file);
         onSuccess(res.url);
@@ -507,6 +517,12 @@ const ProductForm = () => {
       }
       if (!payload.faqs || payload.faqs.length === 0) {
         delete (payload as Partial<ProductFormValues>).faqs;
+      }
+
+      const payloadSize = new Blob([JSON.stringify(payload)]).size;
+      if (payloadSize > MAX_PRODUCT_PAYLOAD_BYTES) {
+        toast.error('Product data is too large. Please upload large icons/files instead of pasting huge SVG content.');
+        return;
       }
 
       if (id) {
