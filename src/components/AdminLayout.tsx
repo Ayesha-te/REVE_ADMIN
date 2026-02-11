@@ -11,7 +11,6 @@ import {
   PlusCircle,
   Truck,
   Star,
-  Sliders
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 
