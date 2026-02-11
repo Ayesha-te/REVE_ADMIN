@@ -20,7 +20,6 @@ const sidebarLinks = [
   { name: 'Products', href: '/products', icon: ShoppingBag },
   { name: 'Categories', href: '/categories', icon: Layers },
   { name: 'Collections', href: '/collections', icon: Folder },
-  { name: 'Filters', href: '/filters', icon: Sliders },
   { name: 'Orders', href: '/orders', icon: ShoppingCart },
   { name: 'Reviews', href: '/reviews', icon: Star },
   { name: 'Delivery & Returns', href: '/policies', icon: Truck },
