@@ -86,5 +86,18 @@ export const apiUpload = async (path: string, file: File): Promise<{ url: string
   if (!res.ok) {
     throw new Error(await res.text());
   }
-  return res.json();
+  const payload = await res.json();
+  const url =
+    (typeof payload?.url === "string" && payload.url) ||
+    (typeof payload?.publicUrl === "string" && payload.publicUrl) ||
+    (typeof payload?.publicURL === "string" && payload.publicURL) ||
+    (typeof payload?.data?.url === "string" && payload.data.url) ||
+    (typeof payload?.data?.publicUrl === "string" && payload.data.publicUrl) ||
+    (typeof payload?.data?.publicURL === "string" && payload.data.publicURL);
+
+  if (!url) {
+    throw new Error("Upload succeeded but no valid URL was returned");
+  }
+
+  return { url };
 };
