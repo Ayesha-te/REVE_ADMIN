@@ -191,15 +191,15 @@ const Orders = () => {
                                       <tr key={`${row.measurement}-${idx}`} className="border-t">
                                         <td className="py-1 pr-2 font-medium whitespace-nowrap">{row.measurement}</td>
                                         {dimensionSizeOrder.map((sizeKey) => (
-                                      <td
-                                        key={`${row.measurement}-${sizeKey}`}
-                                        className="py-1 px-2 whitespace-nowrap"
-                                      >
-                                        {row.values?.[sizeKey] || '-'}
-                                      </td>
+                                          <td
+                                            key={`${row.measurement}-${sizeKey}`}
+                                            className="py-1 px-2 whitespace-nowrap"
+                                          >
+                                            {row.values?.[sizeKey] || '-'}
+                                          </td>
+                                        ))}
+                                      </tr>
                                     ))}
-                                  </tr>
-                                ))}
                                   </tbody>
                                 </table>
                               </div>
