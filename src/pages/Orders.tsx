@@ -110,7 +110,7 @@ const Orders = () => {
                   Status: {selectedOrder.status}
                 </p>
                 <p className="mt-2 text-sm font-semibold text-espresso">
-                  Total: ?{Number(selectedOrder.total_amount).toFixed(2)}
+                  Total: £{Number(selectedOrder.total_amount).toFixed(2)}
                 </p>
               </div>
             </div>
@@ -120,12 +120,12 @@ const Orders = () => {
               <div className="mt-2 space-y-2">
                 {(selectedOrder.items || []).map((item) => {
                   const product = productCache[item.product];
-                  const productColors = product?.colors?.map((c) => c.name).filter(Boolean) || [];
-                  const productFabrics = product?.fabrics?.map((f) => f.name).filter(Boolean) || [];
-                  const productStyles = product?.styles || [];
-                  const productDimensions = product?.dimensions || [];
+                  const productColors = product.colors.map((c) => c.name).filter(Boolean) || [];
+                  const productFabrics = product.fabrics.map((f) => f.name).filter(Boolean) || [];
+                  const productStyles = product.styles || [];
+                  const productDimensions = product.dimensions || [];
                   const dimensionSizeOrder =
-                    productDimensions.length > 0 ? Object.keys(productDimensions[0].values || {}) : [];
+                    productDimensions.length > 0  Object.keys(productDimensions[0].values || {}) : [];
 
                   return (
                     <div key={item.id} className="space-y-2 rounded-md border bg-white p-3 text-sm">
@@ -134,13 +134,13 @@ const Orders = () => {
                           <p className="font-medium text-espresso">{item.product_name || `Product #${item.product}`}</p>
                           <p className="text-xs text-muted-foreground">
                             Qty {item.quantity}
-                            {item.size ? ` ? Size ${item.size}` : ''}
-                            {item.color ? ` ? Colour ${item.color}` : ''}
-                            {item.style ? ` ? Style ${item.style}` : ''}
+                            {item.size  ` • Size ${item.size}` : ''}
+                            {item.color  ` • Colour ${item.color}` : ''}
+                            {item.style  ` • Style ${item.style}` : ''}
                           </p>
                         </div>
                         <div className="font-semibold text-espresso whitespace-nowrap">
-                          ?{Number(item.price).toFixed(2)}
+                          £{Number(item.price).toFixed(2)}
                         </div>
                       </div>
 
@@ -153,9 +153,9 @@ const Orders = () => {
                                 .map((s) => {
                                   const optionLabels =
                                     Array.isArray(s.options) && s.options.length > 0
-                                      ? s.options.map((o) => (typeof o === 'string' ? o : o.label)).filter(Boolean)
+                                       s.options.map((o) => (typeof o === 'string'  o : o.label)).filter(Boolean)
                                       : [];
-                                  return `${s.name}${optionLabels.length ? ` (${optionLabels.join(', ')})` : ''}`;
+                                  return `${s.name}${optionLabels.length  ` (${optionLabels.join(', ')})` : ''}`;
                                 })
                                 .join('; ')}
                             </div>
@@ -194,7 +194,7 @@ const Orders = () => {
                                             key={`${row.measurement}-${sizeKey}`}
                                             className="py-1 px-2 whitespace-nowrap"
                                           >
-                                            {row.values?.[sizeKey]}
+                                            {row.values.[sizeKey]}
                                           </td>
                                         ))}
                                       </tr>
@@ -213,7 +213,6 @@ const Orders = () => {
                   <p className="text-sm text-muted-foreground">No items found for this order.</p>
                 )}
               </div>
-            </div>
             </div>
           </CardContent>
         </Card>
@@ -255,7 +254,7 @@ const Orders = () => {
                       variant="outline"
                       size="sm"
                       onClick={() => viewOrder(order.id)}
-                      disabled={isLoadingDetail && selectedOrder?.id === order.id}
+                      disabled={isLoadingDetail && selectedOrder.id === order.id}
                     >
                       <Eye className="h-4 w-4 mr-2" /> View
                     </Button>
