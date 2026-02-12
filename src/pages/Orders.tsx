@@ -134,9 +134,9 @@ const Orders = () => {
                           <p className="font-medium text-espresso">{item.product_name || `Product #${item.product}`}</p>
                           <p className="text-xs text-muted-foreground">
                             Qty {item.quantity}
-                            {item.size  ` • Size ${item.size}` : ''}
-                            {item.color  ` • Colour ${item.color}` : ''}
-                            {item.style  ` • Style ${item.style}` : ''}
+                            {item.size ? ` • Size ${item.size}` : ''}
+                            {item.color ? ` • Colour ${item.color}` : ''}
+                            {item.style ? ` • Style ${item.style}` : ''}
                           </p>
                         </div>
                         <div className="font-semibold text-espresso whitespace-nowrap">
@@ -153,9 +153,9 @@ const Orders = () => {
                                 .map((s) => {
                                   const optionLabels =
                                     Array.isArray(s.options) && s.options.length > 0
-                                       s.options.map((o) => (typeof o === 'string'  o : o.label)).filter(Boolean)
+                                      ? s.options.map((o) => (typeof o === 'string' ? o : o.label)).filter(Boolean)
                                       : [];
-                                  return `${s.name}${optionLabels.length  ` (${optionLabels.join(', ')})` : ''}`;
+                                  return `${s.name}${optionLabels.length ? ` (${optionLabels.join(', ')})` : ''}`;
                                 })
                                 .join('; ')}
                             </div>
