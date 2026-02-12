@@ -194,7 +194,7 @@ const Orders = () => {
                                             key={`${row.measurement}-${sizeKey}`}
                                             className="py-1 px-2 whitespace-nowrap"
                                           >
-                                            {row.values.[sizeKey]}
+                                            {row.values?.[sizeKey]}
                                           </td>
                                         ))}
                                       </tr>
@@ -254,7 +254,7 @@ const Orders = () => {
                       variant="outline"
                       size="sm"
                       onClick={() => viewOrder(order.id)}
-                      disabled={isLoadingDetail && selectedOrder.id === order.id}
+                      disabled={isLoadingDetail && selectedOrder?.id === order.id}
                     >
                       <Eye className="h-4 w-4 mr-2" /> View
                     </Button>

@@ -272,7 +272,6 @@ const ProductForm = () => {
         const match = value.match(/(\d+(?:\.\d+)?)\s*cm\s*\((\d+(?:\.\d+)?)\s*\"?/i);
         if (match) {
           const cmValue = Number.parseFloat(match[1]);
-          const inchValue = Number.parseFloat(match[2]);
           const newCm = Number((cmValue + 4).toFixed(1));
           const newInches = Number((newCm / 2.54).toFixed(1));
           adjustedValues[size] = `${newCm} cm (${newInches}")`;
