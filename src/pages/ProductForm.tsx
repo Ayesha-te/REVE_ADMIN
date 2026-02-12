@@ -469,10 +469,11 @@ const ProductForm = () => {
         toast.error('Discount must be less than 100%');
         return;
       }
+      // Preserve existing original price while still supporting auto-compute when a discount is set
       const computedOriginalPrice =
         discountPercentage > 0
           ? Number((data.price / discountFactor).toFixed(2))
-          : null;
+          : (data.original_price ?? null);
       const payload: ProductFormValues = {
         ...data,
         short_description: data.short_description.trim(),
