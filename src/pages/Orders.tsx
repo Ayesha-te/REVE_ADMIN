@@ -120,12 +120,12 @@ const Orders = () => {
               <div className="mt-2 space-y-2">
                 {(selectedOrder.items || []).map((item) => {
                   const product = productCache[item.product];
-                  const productColors = product.colors.map((c) => c.name).filter(Boolean) || [];
-                  const productFabrics = product.fabrics.map((f) => f.name).filter(Boolean) || [];
-                  const productStyles = product.styles || [];
-                  const productDimensions = product.dimensions || [];
+                  const productColors = product?.colors?.map((c) => c.name).filter(Boolean) || [];
+                  const productFabrics = product?.fabrics?.map((f) => f.name).filter(Boolean) || [];
+                  const productStyles = product?.styles || [];
+                  const productDimensions = product?.dimensions || [];
                   const dimensionSizeOrder =
-                    productDimensions.length > 0  Object.keys(productDimensions[0].values || {}) : [];
+                    productDimensions.length > 0 ? Object.keys(productDimensions[0].values || {}) : [];
 
                   return (
                     <div key={item.id} className="space-y-2 rounded-md border bg-white p-3 text-sm">
