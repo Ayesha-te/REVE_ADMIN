@@ -10,7 +10,7 @@ import { useEffect, useState } from 'react';
 import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import type { FieldErrors } from 'react-hook-form';
 import { apiGet, apiPost, apiPut, apiUpload } from '../lib/api';
-import type { Category, Product, SubCategory } from '../lib/types';
+import type { Category, Product, ProductDimensionRow, SubCategory } from '../lib/types';
 
 const DIMENSION_SIZE_COLUMNS = ['3ft Single', '4ft Small Double', '4ft6 Double', '5ft King', '6ft Super King'];
 
@@ -55,6 +55,13 @@ const DEFAULT_DIMENSION_ROWS = [
       '6ft Super King': '35 cm (13.8")',
     },
   },
+];
+
+const DIMENSION_MEASUREMENT_SUGGESTIONS = [
+  'Length',
+  'Width',
+  'Headboard Height',
+  'Bed Height',
 ];
 
 const COMMON_COLORS = [
@@ -238,6 +245,14 @@ const ProductForm = () => {
   const availableSubcategories = subcategories.filter((s) => s.category === selectedCategory);
   const watchPrice = watch('price');
   const watchDiscount = watch('discount_percentage');
+  const watchedStyles = watch('styles') || [];
+  const hasWingbackHeadboard = watchedStyles.some((style) => {
+    const nameMatch = (style?.name || '').toLowerCase().includes('wingback');
+    const optionMatch = normalizeStyleOptions((style as { options?: unknown })?.options, false).some(
+      (option) => (option.label || '').toLowerCase().includes('wingback')
+    );
+    return nameMatch || optionMatch;
+  });
   const displayDiscountFactor =
     typeof watchDiscount === 'number' && !Number.isNaN(watchDiscount)
       ? 1 - watchDiscount / 100
@@ -246,6 +261,30 @@ const ProductForm = () => {
     watchPrice && watchDiscount && watchDiscount > 0 && displayDiscountFactor && displayDiscountFactor > 0
       ? (watchPrice / displayDiscountFactor).toFixed(2)
       : '';
+
+  const adjustWidthForWingback = (rows: ProductDimensionRow[]): ProductDimensionRow[] => {
+    if (!hasWingbackHeadboard) return rows;
+    return rows.map((row) => {
+      if ((row.measurement || '').toLowerCase() !== 'width') return row;
+      const adjustedValues: Record<string, string> = {};
+      Object.entries(row.values || {}).forEach(([size, rawValue]) => {
+        const value = String(rawValue || '');
+        const match = value.match(/(\d+(?:\.\d+)?)\s*cm\s*\((\d+(?:\.\d+)?)\s*\"?/i);
+        if (match) {
+          const cmValue = Number.parseFloat(match[1]);
+          const inchValue = Number.parseFloat(match[2]);
+          const newCm = Number((cmValue + 4).toFixed(1));
+          const newInches = Number((newCm / 2.54).toFixed(1));
+          adjustedValues[size] = `${newCm} cm (${newInches}")`;
+        } else if (value.trim().length > 0) {
+          adjustedValues[size] = value;
+        } else {
+          adjustedValues[size] = '';
+        }
+      });
+      return { ...row, values: adjustedValues };
+    });
+  };
 
   const { fields: imageFields, append: appendImage, remove: removeImage, replace: replaceImages } = useFieldArray({
     control,
@@ -1085,10 +1124,12 @@ const ProductForm = () => {
                     size="sm"
                     onClick={() =>
                       replaceDimensions(
-                        DEFAULT_DIMENSION_ROWS.map((row) => ({
-                          measurement: row.measurement,
-                          values: { ...row.values },
-                        }))
+                        adjustWidthForWingback(
+                          DEFAULT_DIMENSION_ROWS.map((row) => ({
+                            measurement: row.measurement,
+                            values: { ...row.values },
+                          }))
+                        )
                       )
                     }
                   >
@@ -1109,28 +1150,35 @@ const ProductForm = () => {
                   </Button>
                 </div>
               </div>
+              {hasWingbackHeadboard && (
+                <div className="rounded-md border border-amber-200 bg-amber-50 text-amber-900 px-3 py-2 text-sm">
+                  Wingback headboard detected: overall bed width increases by ~4 cm to accommodate the winged sides. Length and heights stay the same. Default width values below include this adjustment.
+                </div>
+              )}
               <div className="overflow-x-auto rounded-md border">
-                <table className="min-w-full text-sm">
+                <table className="min-w-[1050px] text-sm">
                   <thead className="bg-muted/60">
                     <tr>
-                      <th className="p-2 text-left font-medium">Measurement</th>
+                      <th className="p-2 text-left font-medium whitespace-nowrap">Measurement</th>
                       {DIMENSION_SIZE_COLUMNS.map((size) => (
-                        <th key={size} className="p-2 text-left font-medium">{size}</th>
+                        <th key={size} className="p-2 text-left font-medium whitespace-nowrap">{size}</th>
                       ))}
-                      <th className="p-2 text-left font-medium">Action</th>
+                      <th className="p-2 text-left font-medium whitespace-nowrap">Action</th>
                     </tr>
                   </thead>
                   <tbody>
                     {dimensionFields.map((field, index) => (
                       <tr key={field.id} className="border-t">
-                        <td className="p-2 align-top">
+                        <td className="p-2 align-top whitespace-nowrap min-w-[150px]">
                           <Input
                             {...register(`dimensions.${index}.measurement` as const)}
                             placeholder="e.g. Length"
+                            list="dimension-measurements"
+                            className="whitespace-nowrap"
                           />
                         </td>
                         {DIMENSION_SIZE_COLUMNS.map((size) => (
-                          <td key={`${field.id}-${size}`} className="p-2 align-top">
+                          <td key={`${field.id}-${size}`} className="p-2 align-top whitespace-nowrap min-w-[175px]">
                             <Controller
                               control={control}
                               name={`dimensions.${index}.values.${size}` as any}
@@ -1139,12 +1187,13 @@ const ProductForm = () => {
                                   value={dimensionField.value || ''}
                                   onChange={dimensionField.onChange}
                                   placeholder='e.g. 193 cm (76.0")'
+                                  className="whitespace-nowrap text-xs sm:text-sm"
                                 />
                               )}
                             />
                           </td>
                         ))}
-                        <td className="p-2 align-top">
+                        <td className="p-2 align-top whitespace-nowrap">
                           <Button
                             type="button"
                             variant="ghost"
@@ -1166,6 +1215,11 @@ const ProductForm = () => {
                   </tbody>
                 </table>
               </div>
+              <datalist id="dimension-measurements">
+                {DIMENSION_MEASUREMENT_SUGGESTIONS.map((measurement) => (
+                  <option key={measurement} value={measurement} />
+                ))}
+              </datalist>
             </div>
 
             <div className="grid gap-2">
