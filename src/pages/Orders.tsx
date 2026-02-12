@@ -137,6 +137,7 @@ const Orders = () => {
                             {item.size ? ` • Size ${item.size}` : ''}
                             {item.color ? ` • Colour ${item.color}` : ''}
                             {item.style ? ` • Style ${item.style}` : ''}
+                            {item.dimension ? ` • Dimension ${item.dimension}` : ''}
                           </p>
                         </div>
                         <div className="font-semibold text-espresso whitespace-nowrap">
@@ -190,18 +191,24 @@ const Orders = () => {
                                       <tr key={`${row.measurement}-${idx}`} className="border-t">
                                         <td className="py-1 pr-2 font-medium whitespace-nowrap">{row.measurement}</td>
                                         {dimensionSizeOrder.map((sizeKey) => (
-                                          <td
-                                            key={`${row.measurement}-${sizeKey}`}
-                                            className="py-1 px-2 whitespace-nowrap"
-                                          >
-                                            {row.values.[sizeKey]}
-                                          </td>
-                                        ))}
-                                      </tr>
+                                      <td
+                                        key={`${row.measurement}-${sizeKey}`}
+                                        className="py-1 px-2 whitespace-nowrap"
+                                      >
+                                        {row.values?.[sizeKey] || '-'}
+                                      </td>
                                     ))}
+                                  </tr>
+                                ))}
                                   </tbody>
                                 </table>
                               </div>
+                            </div>
+                          )}
+                          {item.dimension_details && (
+                            <div>
+                              <span className="font-semibold">Chosen dimension details:</span>{' '}
+                              <span className="text-muted-foreground">{item.dimension_details}</span>
                             </div>
                           )}
                         </div>
@@ -254,7 +261,7 @@ const Orders = () => {
                       variant="outline"
                       size="sm"
                       onClick={() => viewOrder(order.id)}
-                      disabled={isLoadingDetail && selectedOrder.id === order.id}
+                      disabled={isLoadingDetail && selectedOrder?.id === order.id}
                     >
                       <Eye className="h-4 w-4 mr-2" /> View
                     </Button>

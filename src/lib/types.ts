@@ -119,6 +119,8 @@ export interface OrderItem {
   size?: string;
   color?: string;
   style?: string;
+   dimension?: string;
+   dimension_details?: string;
 }
 
 export interface Order {
