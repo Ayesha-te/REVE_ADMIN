@@ -115,6 +115,7 @@ const createProductSchema = (requireImages: boolean) =>
                 description: z.string().optional(),
                 icon_url: z.string().optional(),
                 price_delta: z.number().optional(),
+                size: z.string().optional(),
               })
             )
             .optional(),
@@ -173,7 +174,7 @@ const createProductSchema = (requireImages: boolean) =>
 
 type ProductFormValues = z.infer<ReturnType<typeof createProductSchema>>;
 
-type StyleOptionInput = { label: string; description: string; icon_url?: string; price_delta?: number };
+type StyleOptionInput = { label: string; description: string; icon_url?: string; price_delta?: number; size?: string };
 const MAX_INLINE_SVG_CHARS = 50000;
 const MAX_PRODUCT_PAYLOAD_BYTES = 2500000;
 
@@ -265,9 +266,9 @@ const ProductForm = () => {
   const watchedStyles = watch('styles') || [];
   const hasWingbackHeadboard = watchedStyles.some((style) => {
     const nameMatch = (style?.name || '').toLowerCase().includes('wingback');
-    const optionMatch = normalizeStyleOptions((style as { options?: unknown })?.options, false).some(
-      (option) => (option.label || '').toLowerCase().includes('wingback')
-    );
+          const optionMatch = normalizeStyleOptions((style as { options?: unknown })?.options, false).some(
+            (option) => (option.label || '').toLowerCase().includes('wingback')
+          );
     return nameMatch || optionMatch;
   });
   const displayDiscountFactor =
@@ -1171,11 +1172,12 @@ const ProductForm = () => {
                           value={option.price_delta ?? 0}
                           onChange={(e) => {
                             const current = normalizeStyleOptions(watch(`styles.${index}.options`), true);
-                            const val = parseFloat(e.target.value.replace(/[^0-9.-]/g, '')) || 0;
-                            current[optionIndex] = { ...current[optionIndex], price_delta: val };
-                            setValue(`styles.${index}.options`, current);
-                          }}
-                        />
+                        const raw = e.target.value.replace(/[^0-9.-]/g, '');
+                        const val = raw === '' ? 0 : Number(raw);
+                        current[optionIndex] = { ...current[optionIndex], price_delta: val };
+                        setValue(`styles.${index}.options`, current);
+                      }}
+                    />
                         <Input
                           className="col-span-3"
                           placeholder="Icon (URL or inline SVG)"
