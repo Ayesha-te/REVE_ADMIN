@@ -51,6 +51,9 @@ export interface ProductSize {
 
 export interface ProductStyle {
   id?: number;
+  size?: number | null;
+  size_name?: string;
+  is_shared?: boolean;
   name: string;
   icon_url?: string;
   options: ProductStyleOption[] | string[];
@@ -60,12 +63,15 @@ export interface ProductStyleOption {
   label: string;
   description?: string;
   icon_url?: string;
+  price_delta?: number;
 }
 
 export interface ProductFabric {
   id?: number;
   name: string;
   image_url: string;
+  is_shared?: boolean;
+  colors?: ProductColor[];
 }
 
 export interface ProductFaq {
@@ -121,6 +127,9 @@ export interface OrderItem {
   style?: string;
    dimension?: string;
    dimension_details?: string;
+   selected_variants?: Record<string, string>;
+   extras_total?: number;
+   include_dimension?: boolean;
 }
 
 export interface Order {

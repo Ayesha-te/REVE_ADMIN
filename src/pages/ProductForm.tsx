@@ -106,12 +106,15 @@ const createProductSchema = (requireImages: boolean) =>
         z.object({
           name: z.string().optional(),
           icon_url: z.string().optional(),
+          size: z.string().optional(),
+          is_shared: z.boolean().optional(),
           options: z
             .array(
               z.object({
                 label: z.string().optional(),
                 description: z.string().optional(),
                 icon_url: z.string().optional(),
+                price_delta: z.number().optional(),
               })
             )
             .optional(),
@@ -123,6 +126,16 @@ const createProductSchema = (requireImages: boolean) =>
         z.object({
           name: z.string().optional(),
           image_url: z.string().optional(),
+          is_shared: z.boolean().optional(),
+          colors: z
+            .array(
+              z.object({
+                name: z.string().optional(),
+                hex_code: z.string().optional(),
+                image_url: z.string().optional(),
+              })
+            )
+            .optional(),
         })
       )
       .optional(),
@@ -160,7 +173,7 @@ const createProductSchema = (requireImages: boolean) =>
 
 type ProductFormValues = z.infer<ReturnType<typeof createProductSchema>>;
 
-type StyleOptionInput = { label: string; description: string; icon_url?: string };
+type StyleOptionInput = { label: string; description: string; icon_url?: string; price_delta?: number };
 const MAX_INLINE_SVG_CHARS = 50000;
 const MAX_PRODUCT_PAYLOAD_BYTES = 2500000;
 
@@ -199,8 +212,10 @@ const normalizeStyleOptions = (options: unknown, includeEmpty = false): StyleOpt
           const description = typeof rawDescription === 'string' ? rawDescription.trim() : '';
           const rawIcon = (option as { icon_url?: unknown }).icon_url;
           const icon_url = typeof rawIcon === 'string' ? rawIcon.trim() : '';
+          const rawDelta = (option as { price_delta?: unknown }).price_delta;
+          const price_delta = typeof rawDelta === 'number' ? rawDelta : Number(rawDelta || 0);
           if (!label && !includeEmpty) return null;
-          return { label, description, icon_url };
+          return { label, description, icon_url, price_delta };
         }
         return null;
       })
@@ -369,8 +384,24 @@ const ProductForm = () => {
         const images = product.images.map((i) => ({ url: i.url }));
         const videos = product.videos.map((v) => ({ url: v.url }));
         const colors = product.colors.map((c) => ({ name: c.name, hex_code: c.hex_code || c.image || '#000000' }));
-        const styles = product.styles.map((s) => ({ name: s.name, icon_url: s.icon_url || '', options: normalizeStyleOptions(s.options) }));
-        const fabrics = (product.fabrics || []).map((f) => ({ name: f.name, image_url: f.image_url }));
+        const styles = product.styles.map((s) => ({
+          name: s.name,
+          icon_url: s.icon_url || '',
+          is_shared: s.is_shared ?? false,
+          size: s.size_name || '',
+          options: normalizeStyleOptions(s.options).map((o, idx) => ({
+            ...o,
+            price_delta: typeof (s.options as any[])?.[idx]?.price_delta === 'number'
+              ? Number((s.options as any[])?.[idx]?.price_delta)
+              : 0,
+          })),
+        }));
+        const fabrics = (product.fabrics || []).map((f) => ({
+          name: f.name,
+          image_url: f.image_url,
+          is_shared: f.is_shared ?? false,
+          colors: f.colors || [],
+        }));
         const faqs = (product.faqs || []).map((faq) => ({
           question: (faq.question || '').trim(),
           answer: (faq.answer || '').trim(),
@@ -497,14 +528,23 @@ const ProductForm = () => {
                 label: (option.label || '').trim(),
                 description: (option.description || '').trim(),
                 icon_url: (option.icon_url || '').trim(),
+                price_delta: Number(option.price_delta || 0),
               }))
               .filter((option) => option.label.length > 0),
+            is_shared: Boolean(style.is_shared),
+            size: (style.size || '').trim(),
           }))
           .filter((style) => style.name.length > 0),
         fabrics: (data.fabrics || [])
           .map((fabric) => ({
             name: (fabric.name || '').trim(),
             image_url: (fabric.image_url || '').trim(),
+            is_shared: Boolean(fabric.is_shared),
+            colors: (fabric.colors || []).map((c) => ({
+              name: (c.name || '').trim(),
+              hex_code: (c.hex_code || '#000000').trim(),
+              image_url: (c.image_url || '').trim(),
+            })).filter((c) => c.name.length > 0),
           }))
           .filter((fabric) => fabric.name.length > 0 && fabric.image_url.length > 0),
         features: (data.features || []).map((f) => f.trim()).filter(Boolean),
@@ -959,6 +999,70 @@ const ProductForm = () => {
                       className="h-24 w-24 rounded-md border object-cover"
                     />
                   )}
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      {...register(`fabrics.${index}.is_shared` as const)}
+                      className="h-4 w-4"
+                    />
+                    Shared across sizes
+                  </label>
+                  <div className="space-y-2 rounded-md border border-dashed p-3">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium">Fabric colours</p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const current = (watch(`fabrics.${index}.colors`) || []) as any[];
+                          setValue(`fabrics.${index}.colors`, [...current, { name: '', hex_code: '#000000' }]);
+                        }}
+                      >
+                        <Plus className="h-4 w-4 mr-1" /> Add colour
+                      </Button>
+                    </div>
+                    <div className="space-y-2">
+                      {((watch(`fabrics.${index}.colors`) || []) as any[]).map((color, colorIdx) => (
+                        <div key={`${field.id}-color-${colorIdx}`} className="flex items-center gap-2">
+                          <input
+                            type="color"
+                            value={color.hex_code || '#000000'}
+                            onChange={(e) => {
+                              const current = (watch(`fabrics.${index}.colors`) || []) as any[];
+                              current[colorIdx] = { ...current[colorIdx], hex_code: e.target.value };
+                              setValue(`fabrics.${index}.colors`, current);
+                            }}
+                            className="h-10 w-12 rounded"
+                          />
+                          <Input
+                            value={color.name || ''}
+                            onChange={(e) => {
+                              const current = (watch(`fabrics.${index}.colors`) || []) as any[];
+                              current[colorIdx] = { ...current[colorIdx], name: e.target.value };
+                              setValue(`fabrics.${index}.colors`, current);
+                            }}
+                            placeholder="Colour name"
+                            className="flex-1"
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              const current = (watch(`fabrics.${index}.colors`) || []) as any[];
+                              setValue(
+                                `fabrics.${index}.colors`,
+                                current.filter((_, idx) => idx !== colorIdx)
+                              );
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>
@@ -974,9 +1078,35 @@ const ProductForm = () => {
                 >
                   <Trash2 className="h-4 w-4 text-destructive" />
                 </Button>
-                <div className="grid gap-2">
-                  <label className="text-sm font-medium">Style Name (e.g. Headboard Style)</label>
-                  <Input {...register(`styles.${index}.name` as const)} placeholder="Style group name" />
+                <div className="grid gap-3 sm:grid-cols-2 sm:items-end">
+                  <div className="grid gap-2">
+                    <label className="text-sm font-medium">Style Name (e.g. Headboard Style)</label>
+                    <Input {...register(`styles.${index}.name` as const)} placeholder="Style group name" />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1">
+                      <label className="text-sm font-medium">Applies to size</label>
+                      <select
+                        {...register(`styles.${index}.size` as const)}
+                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      >
+                        <option value="">All sizes (shared)</option>
+                        {(watch('sizes') || []).map((s, idx) => (
+                          <option key={`${s.name}-${idx}`} value={s.name || ''}>
+                            {s.name || `Size ${idx + 1}`}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <label className="mt-6 flex items-center gap-2 text-sm whitespace-nowrap">
+                      <input
+                        type="checkbox"
+                        {...register(`styles.${index}.is_shared` as const)}
+                        className="h-4 w-4"
+                      />
+                      Shared
+                    </label>
+                  </div>
                 </div>
                 <div className="grid gap-2">
                   <label className="text-sm font-medium">Group Icon URL (SVG/PNG)</label>
@@ -1031,12 +1161,24 @@ const ProductForm = () => {
                           }}
                         />
                         <Input
-                          className="col-span-5"
+                          className="col-span-4"
                           placeholder="Description (e.g. choose left or right)"
                           value={option.description || ''}
                           onChange={(e) => {
                             const current = normalizeStyleOptions(watch(`styles.${index}.options`), true);
                             current[optionIndex] = { ...current[optionIndex], description: e.target.value };
+                            setValue(`styles.${index}.options`, current);
+                          }}
+                        />
+                        <Input
+                          className="col-span-2"
+                          placeholder="+£0"
+                          type="number"
+                          step="0.01"
+                          value={option.price_delta ?? 0}
+                          onChange={(e) => {
+                            const current = normalizeStyleOptions(watch(`styles.${index}.options`), true);
+                            current[optionIndex] = { ...current[optionIndex], price_delta: Number(e.target.value || 0) };
                             setValue(`styles.${index}.options`, current);
                           }}
                         />
