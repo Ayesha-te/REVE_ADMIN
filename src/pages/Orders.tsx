@@ -127,6 +127,10 @@ const Orders = () => {
                   const dimensionSizeOrder =
                     productDimensions.length > 0 ? Object.keys(productDimensions[0].values || {}) : [];
 
+                  const variantEntries = Object.entries(item.selected_variants || {}).map(
+                    ([k, v]) => `${k}: ${v}`
+                  );
+                  const extras = Number(item.extras_total || 0);
                   return (
                     <div key={item.id} className="space-y-2 rounded-md border bg-white p-3 text-sm">
                       <div className="flex items-start justify-between gap-3">
@@ -137,8 +141,14 @@ const Orders = () => {
                             {item.size ? ` • Size ${item.size}` : ''}
                             {item.color ? ` • Colour ${item.color}` : ''}
                             {item.style ? ` • Style ${item.style}` : ''}
-                            {item.dimension ? ` • Dimension ${item.dimension}` : ''}
+                            {item.dimension && item.include_dimension !== false ? ` • Dimension ${item.dimension}` : ''}
                           </p>
+                          {variantEntries.length > 0 && (
+                            <p className="text-xs text-muted-foreground">Options: {variantEntries.join(', ')}</p>
+                          )}
+                          {extras > 0 && (
+                            <p className="text-xs text-amber-700">Extras: £{extras.toFixed(2)}</p>
+                          )}
                         </div>
                         <div className="font-semibold text-espresso whitespace-nowrap">
                           £{Number(item.price).toFixed(2)}

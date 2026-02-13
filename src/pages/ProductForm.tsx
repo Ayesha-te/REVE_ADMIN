@@ -107,6 +107,7 @@ const createProductSchema = (requireImages: boolean) =>
           name: z.string().optional(),
           icon_url: z.string().optional(),
           size: z.string().optional(),
+          sizes: z.array(z.string()).optional(),
           is_shared: z.boolean().optional(),
           options: z
             .array(
@@ -116,6 +117,7 @@ const createProductSchema = (requireImages: boolean) =>
                 icon_url: z.string().optional(),
                 price_delta: z.number().optional(),
                 size: z.string().optional(),
+                sizes: z.array(z.string()).optional(),
               })
             )
             .optional(),
@@ -174,7 +176,17 @@ const createProductSchema = (requireImages: boolean) =>
 
 type ProductFormValues = z.infer<ReturnType<typeof createProductSchema>>;
 
-type StyleOptionInput = { label: string; description: string; icon_url?: string; price_delta?: number; size?: string };
+type StyleOptionInput = { label: string; description: string; icon_url?: string; price_delta?: number; size?: string; sizes?: string[] };
+type StyleLibraryItem = {
+  id: number;
+  name: string;
+  icon_url?: string;
+  options: any[];
+  is_shared?: boolean;
+  product_id: number;
+  product_name: string;
+  product_slug: string;
+};
 const MAX_INLINE_SVG_CHARS = 50000;
 const MAX_PRODUCT_PAYLOAD_BYTES = 2500000;
 
@@ -208,7 +220,7 @@ const normalizeStyleOptions = (options: unknown, includeEmpty = false): StyleOpt
         }
         if (option && typeof option === 'object') {
           const rawLabel = (option as { label?: unknown; name?: unknown }).label ?? (option as { name?: unknown }).name;
-          const label = typeof rawLabel === 'string' ? rawLabel.trim() : '';
+          const label = typeof rawLabel === 'string' ? rawLabel.trim().replace(/\s+/g, '-') : '';
           const rawDescription = (option as { description?: unknown }).description;
           const description = typeof rawDescription === 'string' ? rawDescription.trim() : '';
           const rawIcon = (option as { icon_url?: unknown }).icon_url;
@@ -217,8 +229,16 @@ const normalizeStyleOptions = (options: unknown, includeEmpty = false): StyleOpt
           const price_delta = typeof rawDelta === 'number' ? rawDelta : Number(rawDelta || 0);
           const rawSize = (option as { size?: unknown }).size;
           const size = typeof rawSize === 'string' ? rawSize.trim() : '';
+          const rawSizes = (option as { sizes?: unknown }).sizes;
+          const sizes =
+            Array.isArray(rawSizes)
+              ? rawSizes
+                  .map((s) => (typeof s === 'string' ? s.trim() : ''))
+                  .filter(Boolean)
+              : [];
+          if (size && !sizes.includes(size)) sizes.push(size);
           if (!label && !includeEmpty) return null;
-          return { label, description, icon_url, price_delta, size };
+          return { label, description, icon_url, price_delta, size, sizes };
         }
         return null;
       })
@@ -317,6 +337,9 @@ const ProductForm = () => {
     control,
     name: "styles"
   });
+  const [importProductId, setImportProductId] = useState('');
+  const [styleLibrary, setStyleLibrary] = useState<StyleLibraryItem[]>([]);
+  const [isLoadingLibrary, setIsLoadingLibrary] = useState(false);
 
   const { fields: sizeFields, append: appendSize, remove: removeSize, replace: replaceSizes } = useFieldArray({
     control,
@@ -362,6 +385,21 @@ const ProductForm = () => {
       }
     };
     load();
+  }, []);
+
+  useEffect(() => {
+    const loadLibrary = async () => {
+      setIsLoadingLibrary(true);
+      try {
+        const styles = await apiGet<StyleLibraryItem[]>('/style-groups/');
+        setStyleLibrary(styles);
+      } catch {
+        setStyleLibrary([]);
+      } finally {
+        setIsLoadingLibrary(false);
+      }
+    };
+    loadLibrary();
   }, []);
 
   useEffect(() => {
@@ -463,6 +501,39 @@ const ProductForm = () => {
       toast.error('Upload failed');
     } finally {
       setIsUploading(false);
+    }
+  };
+
+  const importStylesFromProduct = async () => {
+    const pid = importProductId.trim();
+    if (!pid) {
+      toast.error('Enter a product ID to import styles');
+      return;
+    }
+    try {
+      const product = await apiGet<Product>(`/products/${pid}/`);
+      const styles = (product.styles || []).map((s) => ({
+        name: (s.name || '').replace(/\s+/g, '-'),
+        icon_url: s.icon_url || '',
+        is_shared: s.is_shared ?? false,
+        options: (s.options || []).map((o: any) => ({
+          label: typeof o === 'string' ? o.replace(/\s+/g, '-') : (o.label || '').replace(/\s+/g, '-'),
+          description: o.description || '',
+          icon_url: o.icon_url || '',
+          price_delta: typeof o.price_delta === 'number' ? Number(o.price_delta) : 0,
+          sizes: Array.isArray(o.sizes)
+            ? o.sizes.map((s: any) => String(s || '').trim()).filter(Boolean)
+            : o.size
+            ? [String(o.size).trim()]
+            : [],
+        })),
+      }));
+      const merged = [...(watch('styles') || []), ...styles];
+      setValue('styles', merged);
+      replaceStyles(merged);
+      toast.success(`Imported ${styles.length} style groups from product #${pid}`);
+    } catch {
+      toast.error('Failed to import styles from that product');
     }
   };
 
@@ -867,11 +938,60 @@ const ProductForm = () => {
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
+          <CardHeader className="flex flex-row items-center justify-between gap-3">
             <CardTitle>Variants</CardTitle>
-            <Button type="button" variant="outline" size="sm" onClick={() => appendStyle({ name: '', options: [] })}>
-              <Plus className="h-4 w-4 mr-2" /> Add Style Group
-            </Button>
+            <div className="flex items-center gap-2">
+              <select
+                className="rounded-md border border-input bg-background px-3 py-2 text-sm"
+                disabled={isLoadingLibrary}
+                onChange={(e) => {
+                  const styleId = Number(e.target.value || 0);
+                  if (!styleId) return;
+                  const found = styleLibrary.find((s) => s.id === styleId);
+                  if (!found) return;
+                  const newStyle = {
+                    name: (found.name || '').replace(/\s+/g, '-'),
+                    icon_url: found.icon_url || '',
+                    is_shared: found.is_shared ?? false,
+                    options: (found.options || []).map((o: any) => ({
+                      label: typeof o === 'string' ? o.replace(/\s+/g, '-') : (o.label || '').replace(/\s+/g, '-'),
+                      description: o.description || '',
+                      icon_url: o.icon_url || '',
+                      price_delta: typeof o.price_delta === 'number' ? Number(o.price_delta) : 0,
+                      sizes: Array.isArray(o.sizes)
+                        ? o.sizes.map((s: any) => String(s || '').trim()).filter(Boolean)
+                        : o.size
+                        ? [String(o.size).trim()]
+                        : [],
+                    })),
+                  };
+                  const merged = [...(watch('styles') || []), newStyle];
+                  setValue('styles', merged);
+                  replaceStyles(merged);
+                  e.target.value = '';
+                  toast.success('Style group added from library');
+                }}
+              >
+                <option value="">{isLoadingLibrary ? 'Loading styles...' : 'Add from library'}</option>
+                {styleLibrary.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name} (#{s.product_id} - {s.product_name})
+                  </option>
+                ))}
+              </select>
+              <Input
+                value={importProductId}
+                onChange={(e) => setImportProductId(e.target.value)}
+                placeholder="Import styles from product ID"
+                className="w-48"
+              />
+              <Button type="button" variant="outline" size="sm" onClick={importStylesFromProduct}>
+                Import
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={() => appendStyle({ name: '', options: [] })}>
+                <Plus className="h-4 w-4 mr-2" /> Add Style Group
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="grid gap-2">
@@ -1084,7 +1204,14 @@ const ProductForm = () => {
                 </Button>
                 <div className="grid gap-2">
                   <label className="text-sm font-medium">Style Name (e.g. Headboard Style)</label>
-                  <Input {...register(`styles.${index}.name` as const)} placeholder="Style group name" />
+                  <Input
+                    {...register(`styles.${index}.name` as const)}
+                    placeholder="Style group name"
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/\s+/g, '-');
+                      setValue(`styles.${index}.name`, value);
+                    }}
+                  />
                 </div>
                 <div className="grid gap-2">
                   <label className="text-sm font-medium">Group Icon URL (SVG/PNG)</label>
@@ -1128,16 +1255,16 @@ const ProductForm = () => {
                   <div className="space-y-2">
                     {normalizeStyleOptions(watch(`styles.${index}.options`), true).map((option, optionIndex) => (
                       <div key={`${field.id}-option-${optionIndex}`} className="grid grid-cols-12 gap-2 items-start">
-                        <Input
-                          className="col-span-3"
-                          placeholder="Option title (e.g. 2 drawers)"
-                          value={option.label}
-                          onChange={(e) => {
-                            const current = normalizeStyleOptions(watch(`styles.${index}.options`), true);
-                            current[optionIndex] = { ...current[optionIndex], label: e.target.value };
-                            setValue(`styles.${index}.options`, current);
-                          }}
-                        />
+                    <Input
+                      className="col-span-3"
+                      placeholder="Option title (e.g. 2 drawers)"
+                      value={option.label}
+                      onChange={(e) => {
+                        const current = normalizeStyleOptions(watch(`styles.${index}.options`), true);
+                        current[optionIndex] = { ...current[optionIndex], label: e.target.value.replace(/\s+/g, '-') };
+                        setValue(`styles.${index}.options`, current);
+                      }}
+                    />
                         <Input
                           className="col-span-3"
                           placeholder="Description (e.g. choose left or right)"
@@ -1148,22 +1275,36 @@ const ProductForm = () => {
                             setValue(`styles.${index}.options`, current);
                           }}
                         />
-                        <select
-                          className="col-span-2 rounded-md border border-input bg-background px-2 py-2 text-sm"
-                          value={option.size || ''}
-                          onChange={(e) => {
-                            const current = normalizeStyleOptions(watch(`styles.${index}.options`), true);
-                            current[optionIndex] = { ...current[optionIndex], size: e.target.value };
-                            setValue(`styles.${index}.options`, current);
-                          }}
-                        >
-                          <option value="">Any size</option>
-                          {(watch('sizes') || []).map((s, idx) => (
-                            <option key={`${s.name}-${idx}`} value={s.name || ''}>
-                              {s.name || `Size ${idx + 1}`}
-                            </option>
-                          ))}
-                        </select>
+                        <div className="col-span-2">
+                          <div className="flex flex-wrap gap-1">
+                            {(watch('sizes') || []).map((s, idx) => {
+                              const val = s.name || `Size ${idx + 1}`;
+                              const current = option.sizes || (option.size ? [option.size] : []);
+                              const checked = current.includes(val);
+                              return (
+                                <label key={`${val}-${idx}`} className="flex items-center gap-1 text-[12px]">
+                                  <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    onChange={(e) => {
+                                      const current = normalizeStyleOptions(watch(`styles.${index}.options`), true);
+                                      const sizes = (current[optionIndex].sizes || []).slice();
+                                      if (e.target.checked) {
+                                        if (!sizes.includes(val)) sizes.push(val);
+                                      } else {
+                                        const i = sizes.indexOf(val);
+                                        if (i >= 0) sizes.splice(i, 1);
+                                      }
+                                      current[optionIndex] = { ...current[optionIndex], sizes };
+                                      setValue(`styles.${index}.options`, current);
+                                    }}
+                                  />
+                                  {val}
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </div>
                         <Input
                           className="col-span-2"
                           placeholder="+£0"
