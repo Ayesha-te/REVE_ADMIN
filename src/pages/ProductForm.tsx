@@ -214,8 +214,10 @@ const normalizeStyleOptions = (options: unknown, includeEmpty = false): StyleOpt
           const icon_url = typeof rawIcon === 'string' ? rawIcon.trim() : '';
           const rawDelta = (option as { price_delta?: unknown }).price_delta;
           const price_delta = typeof rawDelta === 'number' ? rawDelta : Number(rawDelta || 0);
+          const rawSize = (option as { size?: unknown }).size;
+          const size = typeof rawSize === 'string' ? rawSize.trim() : '';
           if (!label && !includeEmpty) return null;
-          return { label, description, icon_url, price_delta };
+          return { label, description, icon_url, price_delta, size };
         }
         return null;
       })
@@ -388,12 +390,13 @@ const ProductForm = () => {
           name: s.name,
           icon_url: s.icon_url || '',
           is_shared: s.is_shared ?? false,
-          size: s.size_name || '',
           options: normalizeStyleOptions(s.options).map((o, idx) => ({
             ...o,
-            price_delta: typeof (s.options as any[])?.[idx]?.price_delta === 'number'
-              ? Number((s.options as any[])?.[idx]?.price_delta)
-              : 0,
+            price_delta:
+              typeof (s.options as any[])?.[idx]?.price_delta === 'number'
+                ? Number((s.options as any[])?.[idx]?.price_delta)
+                : Number(o.price_delta || 0),
+            size: (s.options as any[])?.[idx]?.size || o.size || '',
           })),
         }));
         const fabrics = (product.fabrics || []).map((f) => ({
@@ -529,10 +532,10 @@ const ProductForm = () => {
                 description: (option.description || '').trim(),
                 icon_url: (option.icon_url || '').trim(),
                 price_delta: Number(option.price_delta || 0),
+                size: (option.size || '').trim(),
               }))
               .filter((option) => option.label.length > 0),
             is_shared: Boolean(style.is_shared),
-            size: (style.size || '').trim(),
           }))
           .filter((style) => style.name.length > 0),
         fabrics: (data.fabrics || [])
@@ -1078,35 +1081,9 @@ const ProductForm = () => {
                 >
                   <Trash2 className="h-4 w-4 text-destructive" />
                 </Button>
-                <div className="grid gap-3 sm:grid-cols-2 sm:items-end">
-                  <div className="grid gap-2">
-                    <label className="text-sm font-medium">Style Name (e.g. Headboard Style)</label>
-                    <Input {...register(`styles.${index}.name` as const)} placeholder="Style group name" />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1">
-                      <label className="text-sm font-medium">Applies to size</label>
-                      <select
-                        {...register(`styles.${index}.size` as const)}
-                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                      >
-                        <option value="">All sizes (shared)</option>
-                        {(watch('sizes') || []).map((s, idx) => (
-                          <option key={`${s.name}-${idx}`} value={s.name || ''}>
-                            {s.name || `Size ${idx + 1}`}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <label className="mt-6 flex items-center gap-2 text-sm whitespace-nowrap">
-                      <input
-                        type="checkbox"
-                        {...register(`styles.${index}.is_shared` as const)}
-                        className="h-4 w-4"
-                      />
-                      Shared
-                    </label>
-                  </div>
+                <div className="grid gap-2">
+                  <label className="text-sm font-medium">Style Name (e.g. Headboard Style)</label>
+                  <Input {...register(`styles.${index}.name` as const)} placeholder="Style group name" />
                 </div>
                 <div className="grid gap-2">
                   <label className="text-sm font-medium">Group Icon URL (SVG/PNG)</label>
@@ -1161,7 +1138,7 @@ const ProductForm = () => {
                           }}
                         />
                         <Input
-                          className="col-span-4"
+                          className="col-span-3"
                           placeholder="Description (e.g. choose left or right)"
                           value={option.description || ''}
                           onChange={(e) => {
@@ -1170,15 +1147,32 @@ const ProductForm = () => {
                             setValue(`styles.${index}.options`, current);
                           }}
                         />
+                        <select
+                          className="col-span-2 rounded-md border border-input bg-background px-2 py-2 text-sm"
+                          value={option.size || ''}
+                          onChange={(e) => {
+                            const current = normalizeStyleOptions(watch(`styles.${index}.options`), true);
+                            current[optionIndex] = { ...current[optionIndex], size: e.target.value };
+                            setValue(`styles.${index}.options`, current);
+                          }}
+                        >
+                          <option value="">Any size</option>
+                          {(watch('sizes') || []).map((s, idx) => (
+                            <option key={`${s.name}-${idx}`} value={s.name || ''}>
+                              {s.name || `Size ${idx + 1}`}
+                            </option>
+                          ))}
+                        </select>
                         <Input
                           className="col-span-2"
                           placeholder="+£0"
-                          type="number"
-                          step="0.01"
+                          type="text"
+                          inputMode="decimal"
                           value={option.price_delta ?? 0}
                           onChange={(e) => {
                             const current = normalizeStyleOptions(watch(`styles.${index}.options`), true);
-                            current[optionIndex] = { ...current[optionIndex], price_delta: Number(e.target.value || 0) };
+                            const val = parseFloat(e.target.value.replace(/[^0-9.-]/g, '')) || 0;
+                            current[optionIndex] = { ...current[optionIndex], price_delta: val };
                             setValue(`styles.${index}.options`, current);
                           }}
                         />
