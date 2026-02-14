@@ -591,10 +591,14 @@ const ProductForm = () => {
       const computedOriginalPrice = Number.isFinite(computedOriginalPriceRaw) ? computedOriginalPriceRaw : null;
       const payload: ProductFormValues = {
         ...data,
+        price: Number.isFinite(data.price) ? data.price : 0,
+        delivery_charges: Number.isFinite(data.delivery_charges ?? null)
+          ? Number(data.delivery_charges)
+          : 0,
         short_description: data.short_description.trim(),
         description: data.description.trim(),
-        discount_percentage: discountPercentage,
-        original_price: computedOriginalPrice,
+        discount_percentage: Number.isFinite(discountPercentage) ? discountPercentage : 0,
+        original_price: Number.isFinite(computedOriginalPrice) ? computedOriginalPrice : null,
         images: (data.images || []).filter((img) => (img.url || '').trim().length > 0),
         videos: (data.videos || []).filter((vid) => (vid.url || '').trim().length > 0),
         colors: (data.colors || []).filter((col) => (col.name || '').trim().length > 0),
@@ -613,7 +617,9 @@ const ProductForm = () => {
                 label: (option.label || '').trim(),
                 description: (option.description || '').trim(),
                 icon_url: (option.icon_url || '').trim(),
-                price_delta: Number(option.price_delta || 0),
+                price_delta: Number.isFinite(Number(option.price_delta))
+                  ? Number(option.price_delta)
+                  : 0,
                 size: (option.size || '').trim(),
               }))
               .filter((option) => option.label.length > 0),
