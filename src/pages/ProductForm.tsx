@@ -246,6 +246,14 @@ const normalizeStyleOptions = (options: unknown, includeEmpty = false): StyleOpt
   );
 };
 
+const sanitizeSlug = (value: string, maxLen = 100): string =>
+  (value || '')
+    .normalize('NFKD')
+    .replace(/[^\w.-]+/g, '-') // allow letters, numbers, underscore, dot, dash
+    .replace(/-+/g, '-')
+    .replace(/^[-_.]+|[-_.]+$/g, '')
+    .slice(0, maxLen);
+
 const ProductForm = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -609,22 +617,29 @@ const ProductForm = () => {
           }))
           .filter((s) => s.name.length > 0),
         styles: (data.styles || [])
-          .map((style) => ({
-            name: (style.name || '').trim(),
-            icon_url: (style.icon_url || '').trim(),
-            options: (style.options || [])
-              .map((option) => ({
-                label: (option.label || '').trim(),
-                description: (option.description || '').trim(),
-                icon_url: (option.icon_url || '').trim(),
-                price_delta: Number.isFinite(Number(option.price_delta))
-                  ? Number(option.price_delta)
-                  : 0,
-                size: (option.size || '').trim(),
-              }))
-              .filter((option) => option.label.length > 0),
-            is_shared: Boolean(style.is_shared),
-          }))
+          .map((style) => {
+            const name = sanitizeSlug((style.name || '').trim());
+            const options = (style.options || [])
+              .map((option) => {
+                const label = sanitizeSlug((option.label || '').trim());
+                return {
+                  label,
+                  description: (option.description || '').trim(),
+                  icon_url: (option.icon_url || '').trim(),
+                  price_delta: Number.isFinite(Number(option.price_delta))
+                    ? Number(option.price_delta)
+                    : 0,
+                  size: (option.size || '').trim(),
+                };
+              })
+              .filter((option) => option.label.length > 0);
+            return {
+              name,
+              icon_url: (style.icon_url || '').trim(),
+              options,
+              is_shared: Boolean(style.is_shared),
+            };
+          })
           .filter((style) => style.name.length > 0),
         fabrics: (data.fabrics || [])
           .map((fabric) => ({
@@ -1224,7 +1239,7 @@ const ProductForm = () => {
                     {...register(`styles.${index}.name` as const)}
                     placeholder="Style group name"
                     onChange={(e) => {
-                      const value = e.target.value.replace(/\s+/g, '-');
+                      const value = sanitizeSlug(e.target.value.replace(/\s+/g, '-'));
                       setValue(`styles.${index}.name`, value);
                     }}
                   />
@@ -1277,7 +1292,7 @@ const ProductForm = () => {
                       value={option.label}
                       onChange={(e) => {
                         const current = normalizeStyleOptions(watch(`styles.${index}.options`), true);
-                        current[optionIndex] = { ...current[optionIndex], label: e.target.value.replace(/\s+/g, '-') };
+                        current[optionIndex] = { ...current[optionIndex], label: sanitizeSlug(e.target.value.replace(/\s+/g, '-')) };
                         setValue(`styles.${index}.options`, current);
                       }}
                     />
