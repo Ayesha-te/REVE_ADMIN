@@ -453,6 +453,11 @@ const ProductForm = () => {
                 ? Number((s.options as any[])?.[idx]?.price_delta)
                 : Number(o.price_delta || 0),
             size: (s.options as any[])?.[idx]?.size || o.size || '',
+            sizes: Array.isArray((s.options as any[])?.[idx]?.sizes)
+              ? ((s.options as any[])?.[idx]?.sizes as any[])
+                  .map((sz) => String(sz || '').trim())
+                  .filter(Boolean)
+              : o.sizes || [],
           })),
         }));
         const fabrics = (product.fabrics || []).map((f) => ({
