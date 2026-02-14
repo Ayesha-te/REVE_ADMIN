@@ -413,13 +413,22 @@ const ProductForm = () => {
         setValue('category', product.category);
         setValue('subcategory', product.subcategory || null);
         setValue('price', Number(product.price));
-        setValue('original_price', product.original_price || undefined);
+
+        // Ensure original_price is numeric to satisfy zod validation when editing
+        const originalPrice =
+          product.original_price !== null && product.original_price !== undefined
+            ? Number(product.original_price)
+            : null;
+        setValue('original_price', Number.isFinite(originalPrice) ? originalPrice : null);
         const computedDiscount =
           product.original_price && product.price
             ? Math.round(((product.original_price - product.price) / product.original_price) * 100)
             : 0;
-        setValue('discount_percentage', product.discount_percentage ?? computedDiscount ?? 0);
-        setValue('delivery_charges', product.delivery_charges || 0);
+        const discountPercentage = Number.isFinite(Number(product.discount_percentage))
+          ? Number(product.discount_percentage)
+          : computedDiscount ?? 0;
+        setValue('discount_percentage', discountPercentage);
+        setValue('delivery_charges', Number(product.delivery_charges) || 0);
         setValue('is_bestseller', product.is_bestseller);
         setValue('is_new', product.is_new);
         const images = product.images.map((i) => ({ url: i.url }));
@@ -575,10 +584,11 @@ const ProductForm = () => {
         return;
       }
       // Preserve existing original price while still supporting auto-compute when a discount is set
-      const computedOriginalPrice =
+      const computedOriginalPriceRaw =
         discountPercentage > 0
           ? Number((data.price / discountFactor).toFixed(2))
           : (data.original_price ?? null);
+      const computedOriginalPrice = Number.isFinite(computedOriginalPriceRaw) ? computedOriginalPriceRaw : null;
       const payload: ProductFormValues = {
         ...data,
         short_description: data.short_description.trim(),
