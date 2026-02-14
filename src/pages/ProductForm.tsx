@@ -622,6 +622,9 @@ const ProductForm = () => {
             const options = (style.options || [])
               .map((option) => {
                 const label = sanitizeSlug((option.label || '').trim());
+                const sizes = Array.isArray(option.sizes)
+                  ? option.sizes.map((s) => String(s || '').trim()).filter(Boolean)
+                  : [];
                 return {
                   label,
                   description: (option.description || '').trim(),
@@ -630,6 +633,7 @@ const ProductForm = () => {
                     ? Number(option.price_delta)
                     : 0,
                   size: (option.size || '').trim(),
+                  sizes,
                 };
               })
               .filter((option) => option.label.length > 0);
