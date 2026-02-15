@@ -40,6 +40,7 @@ export interface ProductColor {
   id?: number;
   name: string;
   hex_code?: string;
+  image_url?: string;
   image?: string;
 }
 
@@ -47,6 +48,7 @@ export interface ProductSize {
   id?: number;
   name: string;
   description?: string;
+  price_delta?: number;
 }
 
 export interface ProductStyle {

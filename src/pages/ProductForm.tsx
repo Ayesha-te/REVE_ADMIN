@@ -92,12 +92,13 @@ const createProductSchema = (requireImages: boolean) =>
     is_new: z.boolean().optional(),
     images: z.array(z.object({ url: z.string().optional().nullable() })).optional(),
     videos: z.array(z.object({ url: z.string().optional().nullable() })).optional(),
-    colors: z.array(z.object({ name: z.string().optional(), hex_code: z.string().optional() })).optional(),
+    colors: z.array(z.object({ name: z.string().optional(), hex_code: z.string().optional(), image_url: z.string().optional() })).optional(),
     sizes: z
       .array(
         z.object({
           name: z.string().optional(),
           description: z.string().optional(),
+          price_delta: z.number().optional(),
         })
       )
       .optional(),
@@ -220,7 +221,7 @@ const normalizeStyleOptions = (options: unknown, includeEmpty = false): StyleOpt
         }
         if (option && typeof option === 'object') {
           const rawLabel = (option as { label?: unknown; name?: unknown }).label ?? (option as { name?: unknown }).name;
-          const label = typeof rawLabel === 'string' ? rawLabel.trim().replace(/\s+/g, '-') : '';
+          const label = typeof rawLabel === 'string' ? rawLabel.trim() : '';
           const rawDescription = (option as { description?: unknown }).description;
           const description = typeof rawDescription === 'string' ? rawDescription.trim() : '';
           const rawIcon = (option as { icon_url?: unknown }).icon_url;
@@ -441,7 +442,11 @@ const ProductForm = () => {
         setValue('is_new', product.is_new);
         const images = product.images.map((i) => ({ url: i.url }));
         const videos = product.videos.map((v) => ({ url: v.url }));
-        const colors = product.colors.map((c) => ({ name: c.name, hex_code: c.hex_code || c.image || '#000000' }));
+        const colors = product.colors.map((c) => ({
+          name: c.name,
+          hex_code: c.hex_code || c.image || '#000000',
+          image_url: c.image_url || '',
+        }));
         const styles = product.styles.map((s) => ({
           name: s.name,
           icon_url: s.icon_url || '',
@@ -477,7 +482,11 @@ const ProductForm = () => {
         setValue('images', images);
         setValue('videos', videos);
         setValue('colors', colors);
-        const sizes = product.sizes.map((s) => ({ name: s.name, description: s.description || '' }));
+        const sizes = product.sizes.map((s) => ({
+          name: s.name,
+          description: s.description || '',
+          price_delta: Number(s.price_delta ?? 0),
+        }));
         setValue('sizes', sizes);
         setValue('styles', styles);
         setValue('fabrics', fabrics);
@@ -614,19 +623,26 @@ const ProductForm = () => {
         original_price: Number.isFinite(computedOriginalPrice) ? computedOriginalPrice : null,
         images: (data.images || []).filter((img) => (img.url || '').trim().length > 0),
         videos: (data.videos || []).filter((vid) => (vid.url || '').trim().length > 0),
-        colors: (data.colors || []).filter((col) => (col.name || '').trim().length > 0),
+        colors: (data.colors || [])
+          .map((col) => ({
+            name: (col.name || '').trim(),
+            hex_code: (col.hex_code || '#000000').trim(),
+            image_url: (col.image_url || '').trim(),
+          }))
+          .filter((col) => col.name.length > 0),
         sizes: (data.sizes || [])
           .map((s) => ({
             name: (s.name || '').trim(),
             description: (s.description || '').trim(),
+            price_delta: Number.isFinite(Number(s.price_delta)) ? Number(s.price_delta) : 0,
           }))
           .filter((s) => s.name.length > 0),
         styles: (data.styles || [])
           .map((style) => {
-            const name = sanitizeSlug((style.name || '').trim());
+            const name = (style.name || '').trim();
             const options = (style.options || [])
               .map((option) => {
-                const label = sanitizeSlug((option.label || '').trim());
+                const label = (option.label || '').trim();
                 const sizes = Array.isArray(option.sizes)
                   ? option.sizes.map((s) => String(s || '').trim()).filter(Boolean)
                   : [];
@@ -1037,7 +1053,7 @@ const ProductForm = () => {
             <div className="grid gap-2">
               <div className="flex items-center justify-between">
                 <label className="text-sm font-medium">Sizes</label>
-                <Button type="button" variant="outline" size="sm" onClick={() => appendSize({ name: '', description: '' })}>
+                <Button type="button" variant="outline" size="sm" onClick={() => appendSize({ name: '', description: '', price_delta: 0 })}>
                   <Plus className="h-4 w-4 mr-2" /> Add Size
                 </Button>
               </div>
@@ -1047,10 +1063,17 @@ const ProductForm = () => {
                     <Input
                       className="col-span-4"
                       {...register(`sizes.${index}.name` as const)}
-                      placeholder="Size name (e.g. Small Double +90)"
+                      placeholder="Size name (e.g. Small Double)"
                     />
                     <Input
-                      className="col-span-7"
+                      className="col-span-3"
+                      type="number"
+                      step="0.01"
+                      {...register(`sizes.${index}.price_delta` as const, { valueAsNumber: true })}
+                      placeholder="Price delta (e.g. 90)"
+                    />
+                    <Input
+                      className="col-span-4"
                       {...register(`sizes.${index}.description` as const)}
                       placeholder="Size description (optional)"
                     />
@@ -1093,11 +1116,11 @@ const ProductForm = () => {
                             {color.name}
                           </option>
                         ))}
-                      </select>
-                      <Input
-                        type="color"
-                        value={watch(`colors.${index}.hex_code`) || '#000000'}
-                        onChange={(e) => {
+                  </select>
+                  <Input
+                    type="color"
+                    value={watch(`colors.${index}.hex_code`) || '#000000'}
+                    onChange={(e) => {
                           const name = watch(`colors.${index}.name`);
                           const commonColor = COMMON_COLORS.find(c => c.hex.toLowerCase() === e.target.value.toLowerCase());
                           setValue(`colors.${index}.hex_code`, e.target.value);
@@ -1110,18 +1133,23 @@ const ProductForm = () => {
                         className="w-12 h-10 p-1 rounded-md border cursor-pointer"
                       />
                     </div>
-                    <Input
-                      {...register(`colors.${index}.name` as const)}
-                      placeholder="Custom color name (optional)"
-                      className="text-sm"
-                    />
-                  </div>
-                  <Button type="button" variant="ghost" size="icon" onClick={() => removeColor(index)}>
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
+                  <Input
+                    {...register(`colors.${index}.name` as const)}
+                    placeholder="Custom color name (optional)"
+                    className="text-sm"
+                  />
+                  <Input
+                    {...register(`colors.${index}.image_url` as const)}
+                    placeholder="Image URL (optional; overrides swatch color)"
+                    className="text-sm"
+                  />
                 </div>
+                <Button type="button" variant="ghost" size="icon" onClick={() => removeColor(index)}>
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
+              </div>
               ))}
-              <Button type="button" variant="outline" size="sm" onClick={() => appendColor({ name: '', hex_code: '#000000' })}>
+              <Button type="button" variant="outline" size="sm" onClick={() => appendColor({ name: '', hex_code: '#000000', image_url: '' })}>
                 <Plus className="h-4 w-4 mr-2" /> Add Color
               </Button>
             </div>
