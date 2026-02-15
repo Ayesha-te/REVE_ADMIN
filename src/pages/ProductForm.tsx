@@ -584,6 +584,77 @@ const ProductForm = () => {
     }
   };
 
+  const importSizesFromProduct = async () => {
+    const pid = importProductId.trim();
+    if (!pid) {
+      toast.error('Enter a product ID to import sizes');
+      return;
+    }
+    try {
+      const product = await apiGet<Product>(`/products/${pid}/`);
+      const sizes = (product.sizes || []).map((s) => ({
+        name: s.name || '',
+        description: s.description || '',
+        price_delta: Number.isFinite(Number(s.price_delta)) ? Number(s.price_delta) : 0,
+      }));
+      const merged = [...(watch('sizes') || []), ...sizes];
+      setValue('sizes', merged);
+      replaceSizes(merged);
+      toast.success(`Imported ${sizes.length} size${sizes.length === 1 ? '' : 's'} from product #${pid}`);
+    } catch {
+      toast.error('Failed to import sizes from that product');
+    }
+  };
+
+  const importColorsFromProduct = async () => {
+    const pid = importProductId.trim();
+    if (!pid) {
+      toast.error('Enter a product ID to import colors');
+      return;
+    }
+    try {
+      const product = await apiGet<Product>(`/products/${pid}/`);
+      const colors = (product.colors || []).map((c) => ({
+        name: c.name || '',
+        hex_code: c.hex_code || '#000000',
+        image_url: c.image_url || '',
+      }));
+      const merged = [...(watch('colors') || []), ...colors];
+      setValue('colors', merged);
+      replaceColors(merged);
+      toast.success(`Imported ${colors.length} color${colors.length === 1 ? '' : 's'} from product #${pid}`);
+    } catch {
+      toast.error('Failed to import colors from that product');
+    }
+  };
+
+  const importFabricsFromProduct = async () => {
+    const pid = importProductId.trim();
+    if (!pid) {
+      toast.error('Enter a product ID to import fabrics');
+      return;
+    }
+    try {
+      const product = await apiGet<Product>(`/products/${pid}/`);
+      const fabrics = (product.fabrics || []).map((f) => ({
+        name: f.name || '',
+        image_url: f.image_url || '',
+        is_shared: f.is_shared ?? false,
+        colors: (f.colors || []).map((c) => ({
+          name: c.name || '',
+          hex_code: c.hex_code || '#000000',
+          image_url: c.image_url || '',
+        })),
+      }));
+      const merged = [...(watch('fabrics') || []), ...fabrics];
+      setValue('fabrics', merged);
+      replaceFabrics(merged);
+      toast.success(`Imported ${fabrics.length} fabric${fabrics.length === 1 ? '' : 's'} from product #${pid}`);
+    } catch {
+      toast.error('Failed to import fabrics from that product');
+    }
+  };
+
   const importMattressesFromProduct = async () => {
     const pid = mattressImportId.trim();
     if (!pid) {
@@ -1095,11 +1166,20 @@ const ProductForm = () => {
               <Input
                 value={importProductId}
                 onChange={(e) => setImportProductId(e.target.value)}
-                placeholder="Import styles from product ID"
+                placeholder="Import from product ID"
                 className="w-48"
               />
               <Button type="button" variant="outline" size="sm" onClick={importStylesFromProduct}>
-                Import
+                Import styles
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={importSizesFromProduct}>
+                Import sizes
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={importColorsFromProduct}>
+                Import colors
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={importFabricsFromProduct}>
+                Import fabrics
               </Button>
               <Button type="button" variant="outline" size="sm" onClick={() => appendStyle({ name: '', options: [] })}>
                 <Plus className="h-4 w-4 mr-2" /> Add Style Group
