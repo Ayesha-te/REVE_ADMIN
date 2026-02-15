@@ -36,16 +36,6 @@ const DEFAULT_DIMENSION_ROWS = [
     },
   },
   {
-    measurement: 'Headboard Height',
-    values: {
-      '3ft Single': '135 cm (53.1")',
-      '4ft Small Double': '135 cm (53.1")',
-      '4ft6 Double': '135 cm (53.1")',
-      '5ft King': '135 cm (53.1")',
-      '6ft Super King': '135 cm (53.1")',
-    },
-  },
-  {
     measurement: 'Bed Height',
     values: {
       '3ft Single': '35 cm (13.8")',
@@ -60,7 +50,6 @@ const DEFAULT_DIMENSION_ROWS = [
 const DIMENSION_MEASUREMENT_SUGGESTIONS = [
   'Length',
   'Width',
-  'Headboard Height',
   'Bed Height',
 ];
 
@@ -140,6 +129,17 @@ const createProductSchema = (requireImages: boolean) =>
               })
             )
             .optional(),
+        })
+      )
+      .optional(),
+    mattresses: z
+      .array(
+        z.object({
+          name: z.string().optional(),
+          description: z.string().optional(),
+          image_url: z.string().optional(),
+          price: z.number().nullable().optional(),
+          source_product: z.number().nullable().optional(),
         })
       )
       .optional(),
@@ -263,6 +263,7 @@ const ProductForm = () => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [subcategories, setSubcategories] = useState<SubCategory[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [mattressImportId, setMattressImportId] = useState('');
 
   const { register, control, handleSubmit, formState: { errors }, setValue, watch } = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
@@ -274,6 +275,7 @@ const ProductForm = () => {
       sizes: [],
       styles: [],
       fabrics: [],
+      mattresses: [],
       is_bestseller: false,
       is_new: false,
       discount_percentage: 0,
@@ -363,6 +365,11 @@ const ProductForm = () => {
   const { fields: fabricFields, append: appendFabric, remove: removeFabric, replace: replaceFabrics } = useFieldArray({
     control,
     name: "fabrics"
+  });
+
+  const { fields: mattressFields, append: appendMattress, remove: removeMattress, replace: replaceMattresses } = useFieldArray({
+    control,
+    name: "mattresses"
   });
 
   const { fields: faqFields, append: appendFaq, remove: removeFaq, replace: replaceFaqs } = useFieldArray({
@@ -471,6 +478,13 @@ const ProductForm = () => {
           is_shared: f.is_shared ?? false,
           colors: f.colors || [],
         }));
+        const mattresses = (product.mattresses || []).map((m) => ({
+          name: m.name || '',
+          description: m.description || '',
+          image_url: m.image_url || '',
+          price: m.price !== undefined && m.price !== null ? Number(m.price) : null,
+          source_product: m.source_product || null,
+        }));
         const faqs = (product.faqs || []).map((faq) => ({
           question: (faq.question || '').trim(),
           answer: (faq.answer || '').trim(),
@@ -490,6 +504,7 @@ const ProductForm = () => {
         setValue('sizes', sizes);
         setValue('styles', styles);
         setValue('fabrics', fabrics);
+        setValue('mattresses', mattresses);
         setValue('faqs', faqs);
         setValue('dimensions', dimensions);
         replaceImages(images);
@@ -498,6 +513,7 @@ const ProductForm = () => {
         replaceSizes(sizes);
         replaceStyles(styles);
         replaceFabrics(fabrics);
+        replaceMattresses(mattresses);
         replaceFaqs(faqs);
         replaceDimensions(dimensions);
         setValue('features', product.features || []);
@@ -508,7 +524,7 @@ const ProductForm = () => {
       }
     };
     loadProduct();
-  }, [id, setValue, replaceImages, replaceVideos, replaceColors, replaceSizes, replaceStyles, replaceFabrics, replaceFaqs, replaceDimensions]);
+  }, [id, setValue, replaceImages, replaceVideos, replaceColors, replaceSizes, replaceStyles, replaceFabrics, replaceMattresses, replaceFaqs, replaceDimensions]);
 
   const handleUpload = async (file: File, onSuccess: (url: string) => void, inlineSvgPreferred = false) => {
     setIsUploading(true);
@@ -565,6 +581,30 @@ const ProductForm = () => {
       toast.success(`Imported ${styles.length} style groups from product #${pid}`);
     } catch {
       toast.error('Failed to import styles from that product');
+    }
+  };
+
+  const importMattressesFromProduct = async () => {
+    const pid = mattressImportId.trim();
+    if (!pid) {
+      toast.error('Enter a product ID to import mattresses');
+      return;
+    }
+    try {
+      const product = await apiGet<Product>(`/products/${pid}/`);
+      const mattresses = (product.mattresses || []).map((m) => ({
+        name: m.name || '',
+        description: m.description || '',
+        image_url: m.image_url || '',
+        price: m.price !== undefined && m.price !== null ? Number(m.price) : null,
+        source_product: m.source_product || product.id,
+      }));
+      const merged = [...(watch('mattresses') || []), ...mattresses];
+      setValue('mattresses', merged);
+      replaceMattresses(merged);
+      toast.success(`Imported ${mattresses.length} mattress option${mattresses.length === 1 ? '' : 's'} from product #${pid}`);
+    } catch {
+      toast.error('Failed to import mattresses from that product');
     }
   };
 
@@ -678,6 +718,15 @@ const ProductForm = () => {
             })).filter((c) => c.name.length > 0),
           }))
           .filter((fabric) => fabric.name.length > 0 && fabric.image_url.length > 0),
+        mattresses: (data.mattresses || [])
+          .map((m) => ({
+            name: (m.name || '').trim(),
+            description: (m.description || '').trim(),
+            image_url: (m.image_url || '').trim(),
+            price: m.price === null || m.price === undefined || m.price === '' ? null : Number(m.price),
+            source_product: m.source_product ? Number(m.source_product) : null,
+          }))
+          .filter((m) => (m.name?.length || 0) > 0 || (m.description?.length || 0) > 0 || !!m.image_url || Number.isFinite(m.price)),
         features: (data.features || []).map((f) => f.trim()).filter(Boolean),
         dimensions: (data.dimensions || [])
           .map((row) => {
@@ -718,6 +767,9 @@ const ProductForm = () => {
       }
       if (!payload.fabrics || payload.fabrics.length === 0) {
         delete (payload as Partial<ProductFormValues>).fabrics;
+      }
+      if (!payload.mattresses || payload.mattresses.length === 0) {
+        delete (payload as Partial<ProductFormValues>).mattresses;
       }
       if (!payload.features || payload.features.length === 0) {
         delete (payload as Partial<ProductFormValues>).features;
@@ -1257,6 +1309,99 @@ const ProductForm = () => {
                   </div>
                 </div>
               ))}
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <label className="text-sm font-medium">Mattress options</label>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Input
+                    value={mattressImportId}
+                    onChange={(e) => setMattressImportId(e.target.value)}
+                    placeholder="Import from product ID"
+                    className="w-44"
+                  />
+                  <Button type="button" variant="outline" size="sm" onClick={importMattressesFromProduct}>
+                    Import
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => appendMattress({ name: '', description: '', image_url: '', price: null, source_product: null })}
+                  >
+                    <Plus className="h-4 w-4 mr-2" /> Add Mattress
+                  </Button>
+                </div>
+              </div>
+              {mattressFields.length === 0 && (
+                <p className="text-xs text-muted-foreground">Optional: add mattresses that can be reused by other products.</p>
+              )}
+              <div className="space-y-3">
+                {mattressFields.map((field, index) => (
+                  <div key={field.id} className="space-y-3 rounded-md border p-3 relative">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-2 top-2"
+                      onClick={() => removeMattress(index)}
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input
+                        {...register(`mattresses.${index}.name` as const)}
+                        placeholder="Mattress name (e.g. Winwood Mattress)"
+                        className="col-span-1"
+                      />
+                      <Input
+                        type="number"
+                        step="0.01"
+                        {...register(`mattresses.${index}.price` as const, {
+                          setValueAs: (val) => (val === '' || val === null || val === undefined ? null : Number(val)),
+                        })}
+                        placeholder="Price (optional)"
+                        className="col-span-1"
+                      />
+                      <Input
+                        {...register(`mattresses.${index}.source_product` as const, {
+                          setValueAs: (val) => (val === '' || val === null || val === undefined ? null : Number(val)),
+                        })}
+                        placeholder="Source product ID (optional)"
+                        className="col-span-1"
+                      />
+                      <Input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            handleUpload(file, (url) => setValue(`mattresses.${index}.image_url`, url));
+                          }
+                        }}
+                        className="col-span-1 cursor-pointer bg-black/5"
+                      />
+                    </div>
+                    {watch(`mattresses.${index}.image_url`) && (
+                      <img
+                        src={watch(`mattresses.${index}.image_url`) || undefined}
+                        alt={watch(`mattresses.${index}.name`) || `Mattress ${index + 1}`}
+                        className="h-24 w-24 rounded-md border object-cover"
+                      />
+                    )}
+                    <textarea
+                      {...register(`mattresses.${index}.description` as const)}
+                      className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      placeholder="Description / tension / springs (optional)"
+                    />
+                    <Input
+                      {...register(`mattresses.${index}.image_url` as const)}
+                      placeholder="Image URL (optional)"
+                    />
+                  </div>
+                ))}
+              </div>
             </div>
 
             {styleFields.map((field, index) => (

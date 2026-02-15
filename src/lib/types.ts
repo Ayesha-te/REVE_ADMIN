@@ -77,6 +77,17 @@ export interface ProductFabric {
   colors?: ProductColor[];
 }
 
+export interface ProductMattress {
+  id?: number;
+  name?: string;
+  description?: string;
+  image_url?: string;
+  price?: number | null;
+  source_product?: number | null;
+  source_product_name?: string | null;
+  source_product_slug?: string | null;
+}
+
 export interface ProductFaq {
   question: string;
   answer: string;
@@ -117,6 +128,7 @@ export interface Product {
   sizes: ProductSize[];
   styles: ProductStyle[];
   fabrics: ProductFabric[];
+  mattresses?: ProductMattress[];
 }
 
 export interface OrderItem {
