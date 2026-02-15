@@ -264,6 +264,8 @@ const ProductForm = () => {
   const [subcategories, setSubcategories] = useState<SubCategory[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [mattressImportId, setMattressImportId] = useState('');
+  const [importProductOptions, setImportProductOptions] = useState<Product[]>([]);
+  const [selectedImportProductId, setSelectedImportProductId] = useState<number | null>(null);
 
   const { register, control, handleSubmit, formState: { errors }, setValue, watch } = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
@@ -348,7 +350,7 @@ const ProductForm = () => {
     control,
     name: "styles"
   });
-  const [importProductId, setImportProductId] = useState('');
+  // legacy importProductId no longer used (kept for compatibility if needed)
   const [styleLibrary, setStyleLibrary] = useState<StyleLibraryItem[]>([]);
   const [isLoadingLibrary, setIsLoadingLibrary] = useState(false);
 
@@ -390,12 +392,14 @@ const ProductForm = () => {
   useEffect(() => {
     const load = async () => {
       try {
-        const [cats, subs] = await Promise.all([
+        const [cats, subs, products] = await Promise.all([
           apiGet<Category[]>('/categories/'),
           apiGet<SubCategory[]>('/subcategories/'),
+          apiGet<Product[]>('/products/'),
         ]);
         setCategories(cats);
         setSubcategories(subs);
+        setImportProductOptions(Array.isArray(products) ? products : []);
       } catch {
         toast.error('Failed to load categories');
       }
@@ -552,13 +556,12 @@ const ProductForm = () => {
   };
 
   const importStylesFromProduct = async () => {
-    const pid = importProductId.trim();
-    if (!pid) {
-      toast.error('Enter a product ID to import styles');
+    if (!selectedImportProductId) {
+      toast.error('Select a product to import styles');
       return;
     }
     try {
-      const product = await apiGet<Product>(`/products/${pid}/`);
+      const product = await apiGet<Product>(`/products/${selectedImportProductId}/`);
       const styles = (product.styles || []).map((s) => ({
         name: (s.name || '').replace(/\s+/g, '-'),
         icon_url: s.icon_url || '',
@@ -578,20 +581,19 @@ const ProductForm = () => {
       const merged = [...(watch('styles') || []), ...styles];
       setValue('styles', merged);
       replaceStyles(merged);
-      toast.success(`Imported ${styles.length} style groups from product #${pid}`);
+      toast.success(`Imported ${styles.length} style groups from ${product.name}`);
     } catch {
       toast.error('Failed to import styles from that product');
     }
   };
 
   const importSizesFromProduct = async () => {
-    const pid = importProductId.trim();
-    if (!pid) {
-      toast.error('Enter a product ID to import sizes');
+    if (!selectedImportProductId) {
+      toast.error('Select a product to import sizes');
       return;
     }
     try {
-      const product = await apiGet<Product>(`/products/${pid}/`);
+      const product = await apiGet<Product>(`/products/${selectedImportProductId}/`);
       const sizes = (product.sizes || []).map((s) => ({
         name: s.name || '',
         description: s.description || '',
@@ -600,20 +602,19 @@ const ProductForm = () => {
       const merged = [...(watch('sizes') || []), ...sizes];
       setValue('sizes', merged);
       replaceSizes(merged);
-      toast.success(`Imported ${sizes.length} size${sizes.length === 1 ? '' : 's'} from product #${pid}`);
+      toast.success(`Imported ${sizes.length} size${sizes.length === 1 ? '' : 's'} from ${product.name}`);
     } catch {
       toast.error('Failed to import sizes from that product');
     }
   };
 
   const importColorsFromProduct = async () => {
-    const pid = importProductId.trim();
-    if (!pid) {
-      toast.error('Enter a product ID to import colors');
+    if (!selectedImportProductId) {
+      toast.error('Select a product to import colors');
       return;
     }
     try {
-      const product = await apiGet<Product>(`/products/${pid}/`);
+      const product = await apiGet<Product>(`/products/${selectedImportProductId}/`);
       const colors = (product.colors || []).map((c) => ({
         name: c.name || '',
         hex_code: c.hex_code || '#000000',
@@ -622,20 +623,19 @@ const ProductForm = () => {
       const merged = [...(watch('colors') || []), ...colors];
       setValue('colors', merged);
       replaceColors(merged);
-      toast.success(`Imported ${colors.length} color${colors.length === 1 ? '' : 's'} from product #${pid}`);
+      toast.success(`Imported ${colors.length} color${colors.length === 1 ? '' : 's'} from ${product.name}`);
     } catch {
       toast.error('Failed to import colors from that product');
     }
   };
 
   const importFabricsFromProduct = async () => {
-    const pid = importProductId.trim();
-    if (!pid) {
-      toast.error('Enter a product ID to import fabrics');
+    if (!selectedImportProductId) {
+      toast.error('Select a product to import fabrics');
       return;
     }
     try {
-      const product = await apiGet<Product>(`/products/${pid}/`);
+      const product = await apiGet<Product>(`/products/${selectedImportProductId}/`);
       const fabrics = (product.fabrics || []).map((f) => ({
         name: f.name || '',
         image_url: f.image_url || '',
@@ -649,7 +649,7 @@ const ProductForm = () => {
       const merged = [...(watch('fabrics') || []), ...fabrics];
       setValue('fabrics', merged);
       replaceFabrics(merged);
-      toast.success(`Imported ${fabrics.length} fabric${fabrics.length === 1 ? '' : 's'} from product #${pid}`);
+      toast.success(`Imported ${fabrics.length} fabric${fabrics.length === 1 ? '' : 's'} from ${product.name}`);
     } catch {
       toast.error('Failed to import fabrics from that product');
     }
@@ -1124,66 +1124,74 @@ const ProductForm = () => {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-3">
             <CardTitle>Variants</CardTitle>
-            <div className="flex items-center gap-2">
-              <select
-                className="rounded-md border border-input bg-background px-3 py-2 text-sm"
-                disabled={isLoadingLibrary}
-                onChange={(e) => {
-                  const styleId = Number(e.target.value || 0);
-                  if (!styleId) return;
-                  const found = styleLibrary.find((s) => s.id === styleId);
-                  if (!found) return;
-                  const newStyle = {
-                    name: (found.name || '').replace(/\s+/g, '-'),
-                    icon_url: found.icon_url || '',
-                    is_shared: found.is_shared ?? false,
-                    options: (found.options || []).map((o: any) => ({
-                      label: typeof o === 'string' ? o.replace(/\s+/g, '-') : (o.label || '').replace(/\s+/g, '-'),
-                      description: o.description || '',
-                      icon_url: o.icon_url || '',
-                      price_delta: typeof o.price_delta === 'number' ? Number(o.price_delta) : 0,
-                      sizes: Array.isArray(o.sizes)
-                        ? o.sizes.map((s: any) => String(s || '').trim()).filter(Boolean)
-                        : o.size
-                        ? [String(o.size).trim()]
-                        : [],
-                    })),
-                  };
-                  const merged = [...(watch('styles') || []), newStyle];
-                  setValue('styles', merged);
-                  replaceStyles(merged);
-                  e.target.value = '';
-                  toast.success('Style group added from library');
-                }}
-              >
-                <option value="">{isLoadingLibrary ? 'Loading styles...' : 'Add from library'}</option>
-                {styleLibrary.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name} (#{s.product_id} - {s.product_name})
-                  </option>
-                ))}
-              </select>
-              <Input
-                value={importProductId}
-                onChange={(e) => setImportProductId(e.target.value)}
-                placeholder="Import from product ID"
-                className="w-48"
-              />
-              <Button type="button" variant="outline" size="sm" onClick={importStylesFromProduct}>
-                Import styles
-              </Button>
-              <Button type="button" variant="outline" size="sm" onClick={importSizesFromProduct}>
-                Import sizes
-              </Button>
-              <Button type="button" variant="outline" size="sm" onClick={importColorsFromProduct}>
-                Import colors
-              </Button>
-              <Button type="button" variant="outline" size="sm" onClick={importFabricsFromProduct}>
-                Import fabrics
-              </Button>
-              <Button type="button" variant="outline" size="sm" onClick={() => appendStyle({ name: '', options: [] })}>
-                <Plus className="h-4 w-4 mr-2" /> Add Style Group
-              </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <select
+                  className="rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  disabled={isLoadingLibrary}
+                  onChange={(e) => {
+                    const styleId = Number(e.target.value || 0);
+                    if (!styleId) return;
+                    const found = styleLibrary.find((s) => s.id === styleId);
+                    if (!found) return;
+                    const newStyle = {
+                      name: (found.name || '').replace(/\s+/g, '-'),
+                      icon_url: found.icon_url || '',
+                      is_shared: found.is_shared ?? false,
+                      options: (found.options || []).map((o: any) => ({
+                        label: typeof o === 'string' ? o.replace(/\s+/g, '-') : (o.label || '').replace(/\s+/g, '-'),
+                        description: o.description || '',
+                        icon_url: o.icon_url || '',
+                        price_delta: typeof o.price_delta === 'number' ? Number(o.price_delta) : 0,
+                        sizes: Array.isArray(o.sizes)
+                          ? o.sizes.map((s: any) => String(s || '').trim()).filter(Boolean)
+                          : o.size
+                          ? [String(o.size).trim()]
+                          : [],
+                      })),
+                    };
+                    const merged = [...(watch('styles') || []), newStyle];
+                    setValue('styles', merged);
+                    replaceStyles(merged);
+                    e.target.value = '';
+                    toast.success('Style group added from library');
+                  }}
+                >
+                  <option value="">{isLoadingLibrary ? 'Loading styles...' : 'Add from library'}</option>
+                  {styleLibrary.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} (#{s.product_id} - {s.product_name})
+                    </option>
+                  ))}
+                </select>
+                <select
+                  className="h-10 min-w-[220px] rounded-md border border-input bg-background px-3 text-sm"
+                  value={selectedImportProductId ?? ''}
+                  onChange={(e) => setSelectedImportProductId(e.target.value ? Number(e.target.value) : null)}
+                >
+                  <option value="">Select product to import from</option>
+                  {importProductOptions.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} (#{p.id})
+                    </option>
+                  ))}
+                </select>
+                <Button type="button" variant="outline" size="sm" onClick={importStylesFromProduct}>
+                  Import styles
+                </Button>
+                <Button type="button" variant="outline" size="sm" onClick={importSizesFromProduct}>
+                  Import sizes
+                </Button>
+                <Button type="button" variant="outline" size="sm" onClick={importColorsFromProduct}>
+                  Import colors
+                </Button>
+                <Button type="button" variant="outline" size="sm" onClick={importFabricsFromProduct}>
+                  Import fabrics
+                </Button>
+                <Button type="button" variant="outline" size="sm" onClick={() => appendStyle({ name: '', options: [] })}>
+                  <Plus className="h-4 w-4 mr-2" /> Add Style Group
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent className="space-y-6">
