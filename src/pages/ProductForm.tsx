@@ -723,7 +723,12 @@ const ProductForm = () => {
             name: (m.name || '').trim(),
             description: (m.description || '').trim(),
             image_url: (m.image_url || '').trim(),
-            price: m.price === null || m.price === undefined || m.price === '' ? null : Number(m.price),
+            price: (() => {
+              const raw = (m as { price?: unknown })?.price;
+              if (raw === null || raw === undefined || raw === '') return null;
+              const num = Number(raw as any);
+              return Number.isFinite(num) ? num : null;
+            })(),
             source_product: m.source_product ? Number(m.source_product) : null,
           }))
           .filter((m) => (m.name?.length || 0) > 0 || (m.description?.length || 0) > 0 || !!m.image_url || Number.isFinite(m.price)),
