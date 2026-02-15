@@ -186,3 +186,16 @@ export interface ProductFilterValue {
   product: number;
   filter_option: number;
 }
+
+export interface Review {
+  id: number;
+  product: number;
+  product_name?: string;
+  name: string;
+  rating: number;
+  comment: string;
+  is_visible: boolean;
+  created_at?: string;
+  created_by?: number | null;
+  created_by_username?: string | null;
+}
