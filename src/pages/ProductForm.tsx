@@ -785,10 +785,10 @@ const ProductForm = () => {
             colors: (fabric.colors || [])
               .map((c) => ({
                 name: (c.name || '').trim(),
-                hex_code: (c.hex_code || '#000000').trim(),
+                hex_code: (c.hex_code || '').trim(),
                 image_url: (c.image_url || '').trim(),
               }))
-              .filter((c) => c.name.length > 0 || c.image_url.length > 0),
+              .filter((c) => c.image_url.length > 0),
           }))
           .filter((fabric) => fabric.name.length > 0 && (fabric.colors?.length || 0) > 0),
         mattresses: (data.mattresses || [])
@@ -1304,18 +1304,18 @@ const ProductForm = () => {
             <div className="grid gap-2">
               <div className="flex items-center justify-between">
                 <label className="text-sm font-medium">Fabrics</label>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() =>
-                    appendFabric({
-                      name: '',
-                      is_shared: false,
-                      colors: [{ name: '', hex_code: '#000000', image_url: '' }],
-                    })
-                  }
-                >
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      appendFabric({
+                        name: '',
+                        is_shared: false,
+                        colors: [{ name: '', hex_code: '', image_url: '' }],
+                      })
+                    }
+                  >
                   <Plus className="h-4 w-4 mr-2" /> Add Fabric
                 </Button>
               </div>
@@ -1350,7 +1350,7 @@ const ProductForm = () => {
                           const current = (watch(`fabrics.${index}.colors`) || []) as any[];
                           setValue(`fabrics.${index}.colors`, [
                             ...current,
-                            { name: '', hex_code: '#000000', image_url: '' },
+                            { name: '', hex_code: '', image_url: '' },
                           ]);
                         }}
                       >
@@ -1386,16 +1386,16 @@ const ProductForm = () => {
                                 </span>
                               )}
                             </div>
-                            <input
-                              type="color"
-                              value={color.hex_code || '#000000'}
-                              onChange={(e) => {
-                                const current = (watch(`fabrics.${index}.colors`) || []) as any[];
-                                current[colorIdx] = { ...current[colorIdx], hex_code: e.target.value };
-                                setValue(`fabrics.${index}.colors`, current);
-                              }}
-                              className="h-10 w-12 rounded"
-                            />
+                          <input
+                            type="color"
+                            value={color.hex_code || '#d1d5db'}
+                            onChange={(e) => {
+                              const current = (watch(`fabrics.${index}.colors`) || []) as any[];
+                              current[colorIdx] = { ...current[colorIdx], hex_code: e.target.value };
+                              setValue(`fabrics.${index}.colors`, current);
+                            }}
+                            className="h-10 w-12 rounded"
+                          />
                             <Input
                               value={color.name || ''}
                               onChange={(e) => {
