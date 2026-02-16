@@ -782,13 +782,15 @@ const ProductForm = () => {
             name: (fabric.name || '').trim(),
             image_url: (fabric.image_url || '').trim(),
             is_shared: Boolean(fabric.is_shared),
-            colors: (fabric.colors || []).map((c) => ({
-              name: (c.name || '').trim(),
-              hex_code: (c.hex_code || '#000000').trim(),
-              image_url: (c.image_url || '').trim(),
-            })).filter((c) => c.name.length > 0),
+            colors: (fabric.colors || [])
+              .map((c) => ({
+                name: (c.name || '').trim(),
+                hex_code: (c.hex_code || '#000000').trim(),
+                image_url: (c.image_url || '').trim(),
+              }))
+              .filter((c) => c.name.length > 0 || c.image_url.length > 0),
           }))
-          .filter((fabric) => fabric.name.length > 0 && fabric.image_url.length > 0),
+          .filter((fabric) => fabric.name.length > 0 && (fabric.colors?.length || 0) > 0),
         mattresses: (data.mattresses || [])
           .map((m) => ({
             name: (m.name || '').trim(),
@@ -1301,8 +1303,19 @@ const ProductForm = () => {
 
             <div className="grid gap-2">
               <div className="flex items-center justify-between">
-                <label className="text-sm font-medium">Fabrics (with image)</label>
-                <Button type="button" variant="outline" size="sm" onClick={() => appendFabric({ name: '', image_url: '' })}>
+                <label className="text-sm font-medium">Fabrics</label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    appendFabric({
+                      name: '',
+                      is_shared: false,
+                      colors: [{ name: '', hex_code: '#000000', image_url: '' }],
+                    })
+                  }
+                >
                   <Plus className="h-4 w-4 mr-2" /> Add Fabric
                 </Button>
               </div>
@@ -1318,24 +1331,6 @@ const ProductForm = () => {
                       <Trash2 className="h-4 w-4 text-destructive" />
                     </Button>
                   </div>
-                  <Input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        handleUpload(file, (url) => setValue(`fabrics.${index}.image_url`, url));
-                      }
-                    }}
-                    className="cursor-pointer bg-black/5"
-                  />
-                  {watch(`fabrics.${index}.image_url`) && (
-                    <img
-                      src={watch(`fabrics.${index}.image_url`) || undefined}
-                      alt={watch(`fabrics.${index}.name`) || `Fabric ${index + 1}`}
-                      className="h-24 w-24 rounded-md border object-cover"
-                    />
-                  )}
                   <label className="flex items-center gap-2 text-sm">
                     <input
                       type="checkbox"
@@ -1353,49 +1348,106 @@ const ProductForm = () => {
                         size="sm"
                         onClick={() => {
                           const current = (watch(`fabrics.${index}.colors`) || []) as any[];
-                          setValue(`fabrics.${index}.colors`, [...current, { name: '', hex_code: '#000000' }]);
+                          setValue(`fabrics.${index}.colors`, [
+                            ...current,
+                            { name: '', hex_code: '#000000', image_url: '' },
+                          ]);
                         }}
                       >
                         <Plus className="h-4 w-4 mr-1" /> Add colour
                       </Button>
                     </div>
+                    <p className="text-xs text-muted-foreground">
+                      Add one or more colours for this fabric. Upload the image against each colour (fabric image not required).
+                    </p>
                     <div className="space-y-2">
                       {((watch(`fabrics.${index}.colors`) || []) as any[]).map((color, colorIdx) => (
-                        <div key={`${field.id}-color-${colorIdx}`} className="flex items-center gap-2">
-                          <input
-                            type="color"
-                            value={color.hex_code || '#000000'}
-                            onChange={(e) => {
-                              const current = (watch(`fabrics.${index}.colors`) || []) as any[];
-                              current[colorIdx] = { ...current[colorIdx], hex_code: e.target.value };
-                              setValue(`fabrics.${index}.colors`, current);
-                            }}
-                            className="h-10 w-12 rounded"
-                          />
-                          <Input
-                            value={color.name || ''}
-                            onChange={(e) => {
-                              const current = (watch(`fabrics.${index}.colors`) || []) as any[];
-                              current[colorIdx] = { ...current[colorIdx], name: e.target.value };
-                              setValue(`fabrics.${index}.colors`, current);
-                            }}
-                            placeholder="Colour name"
-                            className="flex-1"
-                          />
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => {
-                              const current = (watch(`fabrics.${index}.colors`) || []) as any[];
-                              setValue(
-                                `fabrics.${index}.colors`,
-                                current.filter((_, idx) => idx !== colorIdx)
-                              );
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
+                        <div
+                          key={`${field.id}-color-${colorIdx}`}
+                          className="space-y-2 rounded-md border border-muted/60 p-2"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="relative h-12 w-12 overflow-hidden rounded-md border">
+                              {color.image_url ? (
+                                <img
+                                  src={color.image_url}
+                                  alt={color.name || 'Colour preview'}
+                                  className="h-full w-full object-cover"
+                                />
+                              ) : (
+                                <div
+                                  className="h-full w-full"
+                                  style={{ backgroundColor: color.hex_code || '#000000' }}
+                                />
+                              )}
+                              {color.name && (
+                                <span className="absolute inset-0 flex items-center justify-center text-[10px] font-semibold text-white drop-shadow-sm text-center px-1">
+                                  {color.name}
+                                </span>
+                              )}
+                            </div>
+                            <input
+                              type="color"
+                              value={color.hex_code || '#000000'}
+                              onChange={(e) => {
+                                const current = (watch(`fabrics.${index}.colors`) || []) as any[];
+                                current[colorIdx] = { ...current[colorIdx], hex_code: e.target.value };
+                                setValue(`fabrics.${index}.colors`, current);
+                              }}
+                              className="h-10 w-12 rounded"
+                            />
+                            <Input
+                              value={color.name || ''}
+                              onChange={(e) => {
+                                const current = (watch(`fabrics.${index}.colors`) || []) as any[];
+                                current[colorIdx] = { ...current[colorIdx], name: e.target.value };
+                                setValue(`fabrics.${index}.colors`, current);
+                              }}
+                              placeholder="Colour name"
+                              className="flex-1"
+                            />
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => {
+                                const current = (watch(`fabrics.${index}.colors`) || []) as any[];
+                                setValue(
+                                  `fabrics.${index}.colors`,
+                                  current.filter((_, idx) => idx !== colorIdx)
+                                );
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
+                          <div className="flex flex-col gap-2 md:flex-row">
+                            <Input
+                              type="file"
+                              accept="image/*"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  handleUpload(file, (url) => {
+                                    const current = (watch(`fabrics.${index}.colors`) || []) as any[];
+                                    current[colorIdx] = { ...current[colorIdx], image_url: url };
+                                    setValue(`fabrics.${index}.colors`, current);
+                                  });
+                                }
+                              }}
+                              className="cursor-pointer bg-black/5 md:flex-1"
+                            />
+                            <Input
+                              value={color.image_url || ''}
+                              onChange={(e) => {
+                                const current = (watch(`fabrics.${index}.colors`) || []) as any[];
+                                current[colorIdx] = { ...current[colorIdx], image_url: e.target.value };
+                                setValue(`fabrics.${index}.colors`, current);
+                              }}
+                              placeholder="Image URL for this colour"
+                              className="md:flex-1"
+                            />
+                          </div>
                         </div>
                       ))}
                     </div>

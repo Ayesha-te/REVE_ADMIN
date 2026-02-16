@@ -72,7 +72,7 @@ export interface ProductStyleOption {
 export interface ProductFabric {
   id?: number;
   name: string;
-  image_url: string;
+  image_url?: string;
   is_shared?: boolean;
   colors?: ProductColor[];
 }
