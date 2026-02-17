@@ -665,6 +665,96 @@ const ProductForm = () => {
     }
   };
 
+  const importFaqsFromProduct = async () => {
+    if (!selectedImportProductId) {
+      toast.error('Select a product to import FAQs');
+      return;
+    }
+    try {
+      const product = await apiGet<Product>(`/products/${selectedImportProductId}/`);
+      const faqs = Array.isArray(product.faqs)
+        ? product.faqs
+            .map((faq) => ({
+              question: (faq.question || '').trim(),
+              answer: (faq.answer || '').trim(),
+            }))
+            .filter((faq) => faq.question && faq.answer)
+        : [];
+
+      if (faqs.length === 0) {
+        toast.error('Selected product has no FAQs to import');
+        return;
+      }
+
+      const existing = (watch('faqs') || []).map((faq) => ({
+        question: (faq.question || '').trim(),
+        answer: (faq.answer || '').trim(),
+      }));
+
+      const deduped = faqs.filter(
+        (faq) =>
+          !existing.some(
+            (e) =>
+              e.question.toLowerCase() === faq.question.toLowerCase() &&
+              e.answer.toLowerCase() === faq.answer.toLowerCase()
+          )
+      );
+
+      const merged = [...existing, ...deduped];
+      setValue('faqs', merged);
+      replaceFaqs(merged);
+      toast.success(`Imported ${deduped.length} FAQ${deduped.length === 1 ? '' : 's'} from ${product.name}`);
+    } catch {
+      toast.error('Failed to import FAQs from that product');
+    }
+  };
+
+  const importDeliveryInfoFromProduct = async () => {
+    if (!selectedImportProductId) {
+      toast.error('Select a product to import delivery info');
+      return;
+    }
+    try {
+      const product = await apiGet<Product>(`/products/${selectedImportProductId}/`);
+      const deliveryInfo = (product.delivery_info || '').trim();
+
+      if (!deliveryInfo) {
+        toast.error('Selected product has no delivery info to import');
+        return;
+      }
+
+      const current = (watch('delivery_info') || '').trim();
+      const merged = current ? `${current}\n\n${deliveryInfo}` : deliveryInfo;
+      setValue('delivery_info', merged);
+      toast.success(`Imported delivery info from ${product.name}`);
+    } catch {
+      toast.error('Failed to import delivery info from that product');
+    }
+  };
+
+  const importReturnsInfoFromProduct = async () => {
+    if (!selectedImportProductId) {
+      toast.error('Select a product to import returns & guarantee info');
+      return;
+    }
+    try {
+      const product = await apiGet<Product>(`/products/${selectedImportProductId}/`);
+      const returnsInfo = (product.returns_guarantee || '').trim();
+
+      if (!returnsInfo) {
+        toast.error('Selected product has no returns/guarantee info to import');
+        return;
+      }
+
+      const current = (watch('returns_guarantee') || '').trim();
+      const merged = current ? `${current}\n\n${returnsInfo}` : returnsInfo;
+      setValue('returns_guarantee', merged);
+      toast.success(`Imported returns & guarantee info from ${product.name}`);
+    } catch {
+      toast.error('Failed to import returns/guarantee info from that product');
+    }
+  };
+
   const importMattressesFromProduct = async () => {
     const pid = mattressImportId.trim();
     if (!pid) {
@@ -1199,6 +1289,15 @@ const ProductForm = () => {
                 </Button>
                 <Button type="button" variant="outline" size="sm" onClick={importFabricsFromProduct}>
                   Import fabrics
+                </Button>
+                <Button type="button" variant="outline" size="sm" onClick={importFaqsFromProduct}>
+                  Import FAQs
+                </Button>
+                <Button type="button" variant="outline" size="sm" onClick={importDeliveryInfoFromProduct}>
+                  Import delivery info
+                </Button>
+                <Button type="button" variant="outline" size="sm" onClick={importReturnsInfoFromProduct}>
+                  Import returns/guarantee
                 </Button>
                 <Button type="button" variant="outline" size="sm" onClick={() => appendStyle({ name: '', options: [] })}>
                   <Plus className="h-4 w-4 mr-2" /> Add Style Group
@@ -1875,11 +1974,16 @@ const ProductForm = () => {
             </div>
 
             <div className="grid gap-2">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <label className="text-sm font-medium">FAQs</label>
-                <Button type="button" variant="outline" size="sm" onClick={() => appendFaq({ question: '', answer: '' })}>
-                  <Plus className="h-4 w-4 mr-2" /> Add FAQ
-                </Button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button type="button" variant="outline" size="sm" onClick={importFaqsFromProduct}>
+                    Import FAQs
+                  </Button>
+                  <Button type="button" variant="outline" size="sm" onClick={() => appendFaq({ question: '', answer: '' })}>
+                    <Plus className="h-4 w-4 mr-2" /> Add FAQ
+                  </Button>
+                </div>
               </div>
               <div className="space-y-2">
                 {faqFields.map((field, index) => (
@@ -1909,19 +2013,39 @@ const ProductForm = () => {
             </div>
 
             <div className="grid gap-2">
-              <label className="text-sm font-medium">Delivery Information</label>
-              <textarea 
-                {...register('delivery_info')} 
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <label className="text-sm font-medium">Delivery Information</label>
+                <Button type="button" variant="outline" size="sm" onClick={importDeliveryInfoFromProduct}>
+                  Import delivery
+                </Button>
+              </div>
+              <textarea
+                {...register('delivery_info')}
+                rows={6}
+                placeholder={`Delivery Process:
+- Headline goes on its own line
+- Details continue on the next line`}
                 className="flex min-h-30 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               />
+              <p className="text-xs text-muted-foreground">Line breaks are preserved on the storefront, so add a blank line before headings.</p>
             </div>
 
             <div className="grid gap-2">
-              <label className="text-sm font-medium">Returns & Guarantee</label>
-              <textarea 
-                {...register('returns_guarantee')} 
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <label className="text-sm font-medium">Returns & Guarantee</label>
+                <Button type="button" variant="outline" size="sm" onClick={importReturnsInfoFromProduct}>
+                  Import returns/guarantee
+                </Button>
+              </div>
+              <textarea
+                {...register('returns_guarantee')}
+                rows={6}
+                placeholder={`Returns & Guarantee:
+- Free returns within 14 days
+- 10-year structural guarantee`}
                 className="flex min-h-30 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               />
+              <p className="text-xs text-muted-foreground">Keep each policy on its own line; headings will stay separated when shown to shoppers.</p>
             </div>
           </CardContent>
         </Card>

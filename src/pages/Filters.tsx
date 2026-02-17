@@ -1,14 +1,17 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
-import { Edit, Trash2, Plus, X, ChevronDown, ChevronRight } from 'lucide-react';
+import { Edit, Trash2, Plus, X, ChevronDown, ChevronRight, ToggleLeft, ToggleRight } from 'lucide-react';
 import { toast } from 'sonner';
-import { apiDelete, apiGet, apiPost, apiPut } from '../lib/api';
-import type { FilterType } from '../lib/types';
+import { apiDelete, apiGet, apiPatch, apiPost, apiPut } from '../lib/api';
+import type { Category, CategoryFilter, FilterType, SubCategory } from '../lib/types';
 
 const Filters = () => {
   const [filterTypes, setFilterTypes] = useState<FilterType[]>([]);
+  const [categoryFilters, setCategoryFilters] = useState<CategoryFilter[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [subcategories, setSubcategories] = useState<SubCategory[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [editingType, setEditingType] = useState<FilterType | null>(null);
   const [expandedTypes, setExpandedTypes] = useState<Set<number>>(new Set());
@@ -27,11 +30,33 @@ const Filters = () => {
     color_code: '',
   });
 
+  const [categoryFilterForm, setCategoryFilterForm] = useState({
+    category: '',
+    subcategory: '',
+    filter_type: '',
+    display_order: 0,
+    is_active: true,
+  });
+
+  const filteredSubcategories = useMemo(() => {
+    if (!categoryFilterForm.category) return subcategories;
+    const catId = Number(categoryFilterForm.category);
+    return subcategories.filter((s) => s.category === catId);
+  }, [categoryFilterForm.category, subcategories]);
+
   const loadData = async () => {
     try {
-      const res = await apiGet<FilterType[]>('/filter-types/');
-      setFilterTypes(res);
-      setExpandedTypes(new Set(res.map((ft) => ft.id)));
+      const [filters, cats, subs, catFilters] = await Promise.all([
+        apiGet<FilterType[]>('/filter-types/'),
+        apiGet<Category[]>('/categories/'),
+        apiGet<SubCategory[]>('/subcategories/'),
+        apiGet<CategoryFilter[]>('/category-filters/'),
+      ]);
+      setFilterTypes(filters);
+      setExpandedTypes(new Set(filters.map((ft) => ft.id)));
+      setCategories(cats);
+      setSubcategories(subs);
+      setCategoryFilters(catFilters);
     } catch {
       toast.error('Failed to load filters');
     }
@@ -146,6 +171,81 @@ const Filters = () => {
       toast.error('Failed to delete filter option');
     }
   };
+
+  const handleSaveCategoryFilter = async () => {
+    const categoryId = Number(categoryFilterForm.category) || null;
+    const subcategoryId = Number(categoryFilterForm.subcategory) || null;
+    const filterTypeId = Number(categoryFilterForm.filter_type) || null;
+
+    if (!filterTypeId) {
+      toast.error('Select a filter type to assign');
+      return;
+    }
+    if (!categoryId && !subcategoryId) {
+      toast.error('Pick a category or subcategory');
+      return;
+    }
+
+    // Enforce mutually exclusive selection to avoid ambiguity
+    const payload = {
+      category: subcategoryId ? null : categoryId,
+      subcategory: subcategoryId || null,
+      filter_type: filterTypeId,
+      display_order: Number(categoryFilterForm.display_order) || 0,
+      is_active: categoryFilterForm.is_active,
+    };
+
+    try {
+      setIsUploading(true);
+      await apiPost('/category-filters/', payload);
+      toast.success('Filter assigned successfully');
+      setCategoryFilterForm({
+        category: '',
+        subcategory: '',
+        filter_type: '',
+        display_order: 0,
+        is_active: true,
+      });
+      loadData();
+    } catch {
+      toast.error('Failed to assign filter');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleDeleteCategoryFilter = async (id: number) => {
+    if (!confirm('Remove this assignment?')) return;
+    try {
+      await apiDelete(`/category-filters/${id}/`);
+      toast.success('Assignment removed');
+      loadData();
+    } catch {
+      toast.error('Failed to remove assignment');
+    }
+  };
+
+  const handleUpdateCategoryFilter = async (id: number, updates: Partial<CategoryFilter>) => {
+    try {
+      await apiPatch(`/category-filters/${id}/`, updates);
+      loadData();
+    } catch {
+      toast.error('Update failed');
+    }
+  };
+
+  const resolvedCategoryFilters = useMemo(() => {
+    const catById = Object.fromEntries(categories.map((c) => [c.id, c.name]));
+    const subById = Object.fromEntries(subcategories.map((s) => [s.id, `${s.name} (${catById[s.category] || 'Unassigned'})`]));
+    const ftById = Object.fromEntries(filterTypes.map((f) => [f.id, f.name]));
+
+    return categoryFilters.map((cf) => ({
+      ...cf,
+      category_name: cf.category ? catById[cf.category] : undefined,
+      subcategory_name: cf.subcategory ? subById[cf.subcategory] : undefined,
+      filter_type_name: ftById[cf.filter_type],
+    }));
+  }, [categories, subcategories, filterTypes, categoryFilters]);
 
   return (
     <div className="space-y-4">
@@ -272,6 +372,181 @@ const Filters = () => {
           )}
         </Card>
       ))}
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Assign Filters to Categories/Subcategories</CardTitle>
+          <p className="text-sm text-gray-600">
+            Choose which filters should show on each category or subcategory page.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Category (optional)</label>
+              <select
+                className="w-full rounded-md border border-input px-3 py-2 text-sm bg-white"
+                value={categoryFilterForm.category}
+                onChange={(e) =>
+                  setCategoryFilterForm({
+                    ...categoryFilterForm,
+                    category: e.target.value,
+                    subcategory: '', // reset subcategory if category selected
+                  })
+                }
+              >
+                <option value="">Select a category</option>
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Subcategory (optional)</label>
+              <select
+                className="w-full rounded-md border border-input px-3 py-2 text-sm bg-white"
+                value={categoryFilterForm.subcategory}
+                onChange={(e) =>
+                  setCategoryFilterForm({
+                    ...categoryFilterForm,
+                    subcategory: e.target.value,
+                    category: '', // prefer subcategory specificity
+                  })
+                }
+              >
+                <option value="">Select a subcategory</option>
+                {filteredSubcategories.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name} ({categories.find((c) => c.id === s.category)?.name || 'No category'})
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-500">Pick a subcategory for more specific filters; leave empty to target the whole category.</p>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Filter Type</label>
+              <select
+                className="w-full rounded-md border border-input px-3 py-2 text-sm bg-white"
+                value={categoryFilterForm.filter_type}
+                onChange={(e) =>
+                  setCategoryFilterForm({
+                    ...categoryFilterForm,
+                    filter_type: e.target.value,
+                  })
+                }
+              >
+                <option value="">Select a filter type</option>
+                {filterTypes.map((ft) => (
+                  <option key={ft.id} value={ft.id}>
+                    {ft.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Display Order</label>
+              <Input
+                type="number"
+                value={categoryFilterForm.display_order}
+                onChange={(e) =>
+                  setCategoryFilterForm({
+                    ...categoryFilterForm,
+                    display_order: Number(e.target.value),
+                  })
+                }
+              />
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={categoryFilterForm.is_active}
+                  onChange={(e) =>
+                    setCategoryFilterForm({
+                      ...categoryFilterForm,
+                      is_active: e.target.checked,
+                    })
+                  }
+                />
+                Active
+              </label>
+            </div>
+          </div>
+          <Button onClick={handleSaveCategoryFilter} disabled={isUploading}>
+            <Plus className="h-4 w-4 mr-2" /> Assign Filter
+          </Button>
+
+          <div className="pt-4 border-t space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold">Current assignments</h3>
+              <span className="text-xs text-gray-500">{resolvedCategoryFilters.length} total</span>
+            </div>
+            {resolvedCategoryFilters.length === 0 ? (
+              <p className="text-sm text-gray-600">No filters assigned yet.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm border border-border">
+                  <thead className="bg-gray-50 text-left">
+                    <tr>
+                      <th className="px-3 py-2">Target</th>
+                      <th className="px-3 py-2">Filter</th>
+                      <th className="px-3 py-2">Order</th>
+                      <th className="px-3 py-2">Active</th>
+                      <th className="px-3 py-2 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {resolvedCategoryFilters.map((cf) => (
+                      <tr key={cf.id} className="border-t">
+                        <td className="px-3 py-2">
+                          {cf.subcategory_name || cf.category_name || '—'}
+                        </td>
+                        <td className="px-3 py-2">{cf.filter_type_name || `Filter #${cf.filter_type}`}</td>
+                        <td className="px-3 py-2">
+                          <Input
+                            type="number"
+                            defaultValue={cf.display_order}
+                            className="h-9 w-24"
+                            onBlur={(e) =>
+                              handleUpdateCategoryFilter(cf.id, { display_order: Number(e.target.value) || 0 })
+                            }
+                          />
+                        </td>
+                        <td className="px-3 py-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleUpdateCategoryFilter(cf.id, { is_active: !cf.is_active })}
+                            title={cf.is_active ? 'Deactivate' : 'Activate'}
+                          >
+                            {cf.is_active ? (
+                              <ToggleRight className="h-5 w-5 text-green-600" />
+                            ) : (
+                              <ToggleLeft className="h-5 w-5 text-gray-400" />
+                            )}
+                          </Button>
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteCategoryFilter(cf.id)}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">

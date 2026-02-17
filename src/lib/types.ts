@@ -196,6 +196,9 @@ export interface CategoryFilter {
   filter_type: number;
   display_order: number;
   is_active: boolean;
+  category_name?: string;
+  subcategory_name?: string;
+  filter_type_name?: string;
 }
 
 export interface ProductFilterValue {
