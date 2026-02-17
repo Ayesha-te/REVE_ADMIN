@@ -140,11 +140,14 @@ export interface OrderItem {
   size?: string;
   color?: string;
   style?: string;
-   dimension?: string;
-   dimension_details?: string;
-   selected_variants?: Record<string, string>;
-   extras_total?: number;
-   include_dimension?: boolean;
+  dimension?: string;
+  dimension_details?: string;
+  selected_variants?: Record<string, string>;
+  extras_total?: number;
+  include_dimension?: boolean;
+  mattress_name?: string | null;
+  mattress_id?: number | null;
+  mattress_price?: number | null;
 }
 
 export interface Order {

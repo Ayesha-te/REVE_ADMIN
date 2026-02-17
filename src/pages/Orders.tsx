@@ -122,7 +122,6 @@ const Orders = () => {
                   const product = productCache[item.product];
                   const productColors = product?.colors?.map((c) => c.name).filter(Boolean) || [];
                   const productFabrics = product?.fabrics?.map((f) => f.name).filter(Boolean) || [];
-                  const productDimensions = product?.dimensions || [];
                   const extras = Number(item.extras_total || 0);
                   return (
                     <div key={item.id} className="space-y-2 rounded-md border bg-white p-3 text-sm">
@@ -133,7 +132,7 @@ const Orders = () => {
                             Qty {item.quantity}
                             {item.size ? ` • Size ${item.size}` : ''}
                             {item.color ? ` • Colour ${item.color}` : ''}
-                          {item.mattress_name && ` • Mattress ${item.mattress_name}`}
+                             {item.mattress_name && ` • Mattress ${item.mattress_name}`}
                           </p>
                           {extras > 0 && (
                             <p className="text-xs text-amber-700">Extras: £{extras.toFixed(2)}</p>
