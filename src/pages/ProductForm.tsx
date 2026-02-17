@@ -302,7 +302,7 @@ const ProductForm = () => {
 
   // Define watched values early for use in effects
   const selectedCategory = watch('category');
-  const featuresValue = (watch('features') || []).join(', ');
+  const featuresValue = (watch('features') || []).join('\n');
   const availableSubcategories = subcategories.filter((s) => s.category === selectedCategory);
   const watchPrice = watch('price');
   const watchDiscount = watch('discount_percentage');
@@ -1750,15 +1750,20 @@ const ProductForm = () => {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid gap-2">
-              <label className="text-sm font-medium">Features (Comma separated)</label>
-              <Input
-                placeholder="UK Handcrafted, Premium Fabric, Free Delivery"
+              <label className="text-sm font-medium">Features (one per line)</label>
+              <textarea
+                className="min-h-[120px] rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                placeholder="Semi-orthopaedic mattress included as standard&#10;Supportive divan base for a stable sleep surface&#10;Castor legs for easy movement"
                 defaultValue={featuresValue}
                 onBlur={(e) => {
-                  const features = e.target.value.split(',').map(f => f.trim()).filter(Boolean);
+                  const features = e.target.value
+                    .split(/[\r\n]+|•/g)
+                    .map((f) => f.trim().replace(/^[\\-–—•]+\\s*/, ''))
+                    .filter(Boolean);
                   setValue('features', features);
                 }}
               />
+              <p className="text-xs text-muted-foreground">Use separate lines (or bullets) to avoid commas becoming extra bullets on the storefront.</p>
             </div>
 
             <div className="grid gap-2">
