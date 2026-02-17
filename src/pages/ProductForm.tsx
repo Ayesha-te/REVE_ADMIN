@@ -257,14 +257,6 @@ const normalizeStyleOptions = (options: unknown, includeEmpty = false): StyleOpt
   );
 };
 
-const sanitizeSlug = (value: string, maxLen = 100): string =>
-  (value || '')
-    .normalize('NFKD')
-    .replace(/[^\w.-]+/g, '-') // allow letters, numbers, underscore, dot, dash
-    .replace(/-+/g, '-')
-    .replace(/^[-_.]+|[-_.]+$/g, '')
-    .slice(0, maxLen);
-
 const ProductForm = () => {
   const { id } = useParams();
   const navigate = useNavigate();
