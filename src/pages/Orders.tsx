@@ -122,14 +122,7 @@ const Orders = () => {
                   const product = productCache[item.product];
                   const productColors = product?.colors?.map((c) => c.name).filter(Boolean) || [];
                   const productFabrics = product?.fabrics?.map((f) => f.name).filter(Boolean) || [];
-                  const productStyles = product?.styles || [];
                   const productDimensions = product?.dimensions || [];
-                  const dimensionSizeOrder =
-                    productDimensions.length > 0 ? Object.keys(productDimensions[0].values || {}) : [];
-
-                  const variantEntries = Object.entries(item.selected_variants || {}).map(
-                    ([k, v]) => `${k}: ${v}`
-                  );
                   const extras = Number(item.extras_total || 0);
                   return (
                     <div key={item.id} className="space-y-2 rounded-md border bg-white p-3 text-sm">
@@ -140,12 +133,8 @@ const Orders = () => {
                             Qty {item.quantity}
                             {item.size ? ` • Size ${item.size}` : ''}
                             {item.color ? ` • Colour ${item.color}` : ''}
-                            {item.style ? ` • Style ${item.style}` : ''}
-                            {item.dimension && item.include_dimension !== false ? ` • Dimension ${item.dimension}` : ''}
+                          {item.mattress_name && ` • Mattress ${item.mattress_name}`}
                           </p>
-                          {variantEntries.length > 0 && (
-                            <p className="text-xs text-muted-foreground">Options: {variantEntries.join(', ')}</p>
-                          )}
                           {extras > 0 && (
                             <p className="text-xs text-amber-700">Extras: £{extras.toFixed(2)}</p>
                           )}
@@ -155,74 +144,26 @@ const Orders = () => {
                         </div>
                       </div>
 
-                      {product && (
-                        <div className="grid gap-2 rounded border border-muted/40 bg-muted/10 p-2 text-xs text-espresso">
-                          {productStyles.length > 0 && (
-                            <div>
-                              <span className="font-semibold">Style groups:</span>{' '}
-                              {productStyles
-                                .map((s) => {
-                                  const optionLabels =
-                                    Array.isArray(s.options) && s.options.length > 0
-                                      ? s.options.map((o) => (typeof o === 'string' ? o : o.label)).filter(Boolean)
-                                      : [];
-                                  return `${s.name}${optionLabels.length ? ` (${optionLabels.join(', ')})` : ''}`;
-                                })
-                                .join('; ')}
-                            </div>
-                          )}
-                          {productColors.length > 0 && (
-                            <div>
-                              <span className="font-semibold">Colors:</span> {productColors.join(', ')}
-                            </div>
-                          )}
-                          {productFabrics.length > 0 && (
-                            <div>
-                              <span className="font-semibold">Fabrics:</span> {productFabrics.join(', ')}
-                            </div>
-                          )}
-                          {productDimensions.length > 0 && (
-                            <div className="space-y-1">
-                              <div className="font-semibold">Dimensions:</div>
-                              <div className="overflow-x-auto">
-                                <table className="min-w-full text-[11px]">
-                                  <thead>
-                                    <tr>
-                                      <th className="py-1 pr-2 text-left">Measurement</th>
-                                      {dimensionSizeOrder.map((sizeKey) => (
-                                        <th key={sizeKey} className="py-1 px-2 text-left">
-                                          {sizeKey}
-                                        </th>
-                                      ))}
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {productDimensions.map((row, idx) => (
-                                      <tr key={`${row.measurement}-${idx}`} className="border-t">
-                                        <td className="py-1 pr-2 font-medium whitespace-nowrap">{row.measurement}</td>
-                                        {dimensionSizeOrder.map((sizeKey) => (
-                                          <td
-                                            key={`${row.measurement}-${sizeKey}`}
-                                            className="py-1 px-2 whitespace-nowrap"
-                                          >
-                                            {row.values?.[sizeKey] || '-'}
-                                          </td>
-                                        ))}
-                                      </tr>
-                                    ))}
-                                  </tbody>
-                                </table>
-                              </div>
-                            </div>
-                          )}
-                          {item.dimension_details && (
-                            <div>
-                              <span className="font-semibold">Chosen dimension details:</span>{' '}
-                              <span className="text-muted-foreground">{item.dimension_details}</span>
-                            </div>
-                          )}
-                        </div>
-                      )}
+                       {product && (
+                         <div className="grid gap-2 rounded border border-muted/40 bg-muted/10 p-2 text-xs text-espresso">
+                           {productColors.length > 0 && (
+                             <div>
+                               <span className="font-semibold">Colors:</span> {productColors.join(', ')}
+                             </div>
+                           )}
+                           {productFabrics.length > 0 && (
+                             <div>
+                               <span className="font-semibold">Fabrics:</span> {productFabrics.join(', ')}
+                             </div>
+                           )}
+                           {(item.mattress_name || item.selected_variants?.Mattress) && (
+                             <div>
+                               <span className="font-semibold">Mattress:</span>{' '}
+                               {item.mattress_name || item.selected_variants?.Mattress}
+                             </div>
+                           )}
+                         </div>
+                       )}
                     </div>
                   );
                 })}

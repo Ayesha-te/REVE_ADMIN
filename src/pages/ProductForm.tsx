@@ -55,24 +55,12 @@ const DEFAULT_DIMENSION_ROWS = [
       '6ft Super King': '35 cm (13.8")',
     },
   },
-  {
-    measurement: 'Headboard Height',
-    values: {
-      '2ft6 Small Single': '135 cm (53.1")',
-      '3ft Single': '135 cm (53.1")',
-      '4ft Small Double': '135 cm (53.1")',
-      '4ft6 Double': '135 cm (53.1")',
-      '5ft King': '135 cm (53.1")',
-      '6ft Super King': '135 cm (53.1")',
-    },
-  },
 ];
 
 const DIMENSION_MEASUREMENT_SUGGESTIONS = [
   'Length',
   'Width',
   'Bed Height',
-  'Headboard Height',
 ];
 
 const COMMON_COLORS = [
