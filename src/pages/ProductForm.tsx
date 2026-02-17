@@ -1675,8 +1675,8 @@ const ProductForm = () => {
                     {...register(`styles.${index}.name` as const)}
                     placeholder="Style group name"
                     onChange={(e) => {
-                      const value = sanitizeSlug(e.target.value.replace(/\s+/g, '-'));
-                      setValue(`styles.${index}.name`, value);
+                      // Allow natural text (spaces, quotes, inches)
+                      setValue(`styles.${index}.name`, e.target.value);
                     }}
                   />
                 </div>
@@ -1724,11 +1724,11 @@ const ProductForm = () => {
                       <div key={`${field.id}-option-${optionIndex}`} className="grid grid-cols-12 gap-2 items-start">
                     <Input
                       className="col-span-3"
-                      placeholder="Option title (e.g. 2 drawers)"
+                      placeholder='Option title (e.g. 2 drawers or 54" Floorstanding)'
                       value={option.label}
                       onChange={(e) => {
                         const current = normalizeStyleOptions(watch(`styles.${index}.options`), true);
-                        current[optionIndex] = { ...current[optionIndex], label: sanitizeSlug(e.target.value.replace(/\s+/g, '-')) };
+                        current[optionIndex] = { ...current[optionIndex], label: e.target.value };
                         setValue(`styles.${index}.options`, current);
                       }}
                     />
