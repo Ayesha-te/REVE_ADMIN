@@ -116,6 +116,9 @@ export interface Product {
   faqs?: ProductFaq[];
   delivery_info?: string;
   returns_guarantee?: string;
+  delivery_title?: string;
+  returns_title?: string;
+  custom_info_sections?: { title?: string; content?: string }[];
   delivery_charges?: number;
   in_stock: boolean;
   is_bestseller: boolean;
@@ -129,6 +132,7 @@ export interface Product {
   styles: ProductStyle[];
   fabrics: ProductFabric[];
   mattresses?: ProductMattress[];
+  filter_values?: { filter_option_id?: number; filter_option?: number; filter_type?: string; option?: string }[];
 }
 
 export interface OrderItem {
@@ -205,6 +209,8 @@ export interface ProductFilterValue {
   id: number;
   product: number;
   filter_option: number;
+  filter_option_id?: number;
+  filter_type?: string;
 }
 
 export interface Review {

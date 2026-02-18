@@ -538,124 +538,129 @@ const Categories = () => {
                 </Button>
               </div>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Filter Type</label>
-                <select
-                  className="w-full rounded-md border border-input px-3 py-2 text-sm bg-white"
-                  value={filterForm.filter_type}
-                  onChange={(e) => setFilterForm({ ...filterForm, filter_type: e.target.value })}
-                >
-                  <option value="">Select filter</option>
-                  {filterTypes.map((ft) => (
-                    <option key={ft.id} value={ft.id}>
-                      {ft.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="rounded-md border border-border/70 bg-muted/40 p-3 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-semibold">Quick create filter type</span>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={handleQuickCreateFilterType}
-                    disabled={isCreatingType}
-                  >
-                    {isCreatingType ? 'Saving...' : 'Create'}
-                  </Button>
-                </div>
-                <Input
-                  placeholder="Name (e.g., Bed Size)"
-                  value={quickFilterForm.name}
-                  onChange={(e) =>
-                    setQuickFilterForm({
-                      ...quickFilterForm,
-                      name: e.target.value,
-                      slug: e.target.value.toLowerCase().replace(/\s+/g, '-'),
-                    })
-                  }
-                />
-                <Input
-                  placeholder="Slug (e.g., bed-size)"
-                  value={quickFilterForm.slug}
-                  onChange={(e) =>
-                    setQuickFilterForm({ ...quickFilterForm, slug: e.target.value })
-                  }
-                />
-                <div className="grid gap-2">
-                  <label className="text-sm font-medium">Display Type</label>
+            <CardContent className="space-y-5">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Filter Type</label>
                   <select
                     className="w-full rounded-md border border-input px-3 py-2 text-sm bg-white"
-                    value={quickFilterForm.display_type}
-                    onChange={(e) =>
-                      setQuickFilterForm({
-                        ...quickFilterForm,
-                        display_type: e.target.value as FilterType['display_type'],
-                      })
-                    }
+                    value={filterForm.filter_type}
+                    onChange={(e) => setFilterForm({ ...filterForm, filter_type: e.target.value })}
                   >
-                    <option value="checkbox">Checkbox list</option>
-                    <option value="color_swatch">Color swatch</option>
-                    <option value="radio">Radio buttons</option>
-                    <option value="dropdown">Dropdown</option>
+                    <option value="">Select filter</option>
+                    {filterTypes.map((ft) => (
+                      <option key={ft.id} value={ft.id}>
+                        {ft.name}
+                      </option>
+                    ))}
                   </select>
+                  <p className="text-xs text-muted-foreground">Pick an existing filter or create one on the right.</p>
                 </div>
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={quickFilterForm.is_expanded_by_default}
+
+                <div className="rounded-md border border-border bg-white p-3 shadow-sm space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-semibold">Quick create filter type</span>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleQuickCreateFilterType}
+                      disabled={isCreatingType}
+                    >
+                      {isCreatingType ? 'Saving...' : 'Create'}
+                    </Button>
+                  </div>
+                  <Input
+                    placeholder="Name (e.g., Bed Size)"
+                    value={quickFilterForm.name}
                     onChange={(e) =>
                       setQuickFilterForm({
                         ...quickFilterForm,
-                        is_expanded_by_default: e.target.checked,
+                        name: e.target.value,
+                        slug: e.target.value.toLowerCase().replace(/\s+/g, '-'),
                       })
                     }
                   />
-                  Expanded by default
-                </label>
-                <p className="text-xs text-muted-foreground">
-                  Create a filter type here, then it will appear in the list above automatically.
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Target (optional subcategory)</label>
-                <select
-                  className="w-full rounded-md border border-input px-3 py-2 text-sm bg-white"
-                  value={filterForm.subcategory}
-                  onChange={(e) => setFilterForm({ ...filterForm, subcategory: e.target.value })}
-                  disabled={!filterTargetCategoryId}
-                >
-                  <option value="">Apply to whole category</option>
-                  {(categories.find((c) => c.id === filterTargetCategoryId)?.subcategories || []).map((sub) => (
-                    <option key={sub.id} value={sub.id}>
-                      {sub.name}
-                    </option>
-                  ))}
-                </select>
-                <p className="text-xs text-muted-foreground">
-                  Choose a subcategory to target it specifically; leave blank to apply to the whole category.
-                </p>
-              </div>
-
-              <div className="grid gap-2">
-                <label className="text-sm font-medium">Display Order</label>
-                <Input
-                  type="number"
-                  value={filterForm.display_order}
-                  onChange={(e) => setFilterForm({ ...filterForm, display_order: Number(e.target.value) })}
-                />
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={filterForm.is_active}
-                    onChange={(e) => setFilterForm({ ...filterForm, is_active: e.target.checked })}
+                  <Input
+                    placeholder="Slug (e.g., bed-size)"
+                    value={quickFilterForm.slug}
+                    onChange={(e) =>
+                      setQuickFilterForm({ ...quickFilterForm, slug: e.target.value })
+                    }
                   />
-                  Active
-                </label>
+                  <div className="grid gap-2">
+                    <label className="text-sm font-medium">Display Type</label>
+                    <select
+                      className="w-full rounded-md border border-input px-3 py-2 text-sm bg-white"
+                      value={quickFilterForm.display_type}
+                      onChange={(e) =>
+                        setQuickFilterForm({
+                          ...quickFilterForm,
+                          display_type: e.target.value as FilterType['display_type'],
+                        })
+                      }
+                    >
+                      <option value="checkbox">Checkbox list</option>
+                      <option value="color_swatch">Color swatch</option>
+                      <option value="radio">Radio buttons</option>
+                      <option value="dropdown">Dropdown</option>
+                    </select>
+                  </div>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={quickFilterForm.is_expanded_by_default}
+                      onChange={(e) =>
+                        setQuickFilterForm({
+                          ...quickFilterForm,
+                          is_expanded_by_default: e.target.checked,
+                        })
+                      }
+                    />
+                    Expanded by default
+                  </label>
+                  <p className="text-xs text-muted-foreground">
+                    Create a filter type here; it will appear in the list and auto-select.
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Target (optional subcategory)</label>
+                  <select
+                    className="w-full rounded-md border border-input px-3 py-2 text-sm bg-white"
+                    value={filterForm.subcategory}
+                    onChange={(e) => setFilterForm({ ...filterForm, subcategory: e.target.value })}
+                    disabled={!filterTargetCategoryId}
+                  >
+                    <option value="">Apply to whole category</option>
+                    {(categories.find((c) => c.id === filterTargetCategoryId)?.subcategories || []).map((sub) => (
+                      <option key={sub.id} value={sub.id}>
+                        {sub.name}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-muted-foreground">
+                    Choose a subcategory to target it; leave blank for whole category.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Display Order</label>
+                  <Input
+                    type="number"
+                    value={filterForm.display_order}
+                    onChange={(e) => setFilterForm({ ...filterForm, display_order: Number(e.target.value) })}
+                  />
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={filterForm.is_active}
+                      onChange={(e) => setFilterForm({ ...filterForm, is_active: e.target.checked })}
+                    />
+                    Active
+                  </label>
+                </div>
               </div>
 
               <div className="flex justify-end gap-2 pt-2">

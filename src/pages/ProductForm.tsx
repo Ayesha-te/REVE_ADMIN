@@ -10,7 +10,7 @@ import { useEffect, useState } from 'react';
 import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import type { FieldErrors } from 'react-hook-form';
 import { apiGet, apiPost, apiPut, apiUpload } from '../lib/api';
-import type { Category, Product, ProductDimensionRow, SubCategory } from '../lib/types';
+import type { Category, Product, ProductDimensionRow, SubCategory, FilterType } from '../lib/types';
 
 const DIMENSION_SIZE_COLUMNS = [
   '2ft6 Small Single',
@@ -172,6 +172,16 @@ const createProductSchema = (requireImages: boolean) =>
       .optional(),
     delivery_info: z.string().optional(),
     returns_guarantee: z.string().optional(),
+    delivery_title: z.string().optional(),
+    returns_title: z.string().optional(),
+    custom_info_sections: z
+      .array(
+        z.object({
+          title: z.string().optional(),
+          content: z.string().optional(),
+        })
+      )
+      .optional(),
   })
   .superRefine((values, ctx) => {
     if (!requireImages) return;
@@ -268,6 +278,7 @@ const ProductForm = () => {
   const [mattressImportId, setMattressImportId] = useState('');
   const [importProductOptions, setImportProductOptions] = useState<Product[]>([]);
   const [selectedImportProductId, setSelectedImportProductId] = useState<number | null>(null);
+  const [filterTypes, setFilterTypes] = useState<FilterType[]>([]);
 
   const { register, control, handleSubmit, formState: { errors }, setValue, watch } = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
@@ -289,6 +300,10 @@ const ProductForm = () => {
       faqs: [],
       delivery_info: '',
       returns_guarantee: '',
+      delivery_title: '',
+      returns_title: '',
+      custom_info_sections: [],
+      filter_values: [],
     }
   });
 
@@ -382,6 +397,26 @@ const ProductForm = () => {
   });
 
   const {
+    fields: infoSectionFields,
+    append: appendInfoSection,
+    remove: removeInfoSection,
+    replace: replaceInfoSections,
+  } = useFieldArray({
+    control,
+    name: "custom_info_sections",
+  });
+
+  const {
+    fields: filterValueFields,
+    append: appendFilterValue,
+    remove: removeFilterValue,
+    replace: replaceFilterValues,
+  } = useFieldArray({
+    control,
+    name: "filter_values",
+  });
+
+  const {
     fields: dimensionFields,
     append: appendDimension,
     remove: removeDimension,
@@ -394,14 +429,16 @@ const ProductForm = () => {
   useEffect(() => {
     const load = async () => {
       try {
-        const [cats, subs, products] = await Promise.all([
+        const [cats, subs, products, filters] = await Promise.all([
           apiGet<Category[]>('/categories/'),
           apiGet<SubCategory[]>('/subcategories/'),
           apiGet<Product[]>('/products/'),
+          apiGet<FilterType[]>('/filter-types/'),
         ]);
         setCategories(cats);
         setSubcategories(subs);
         setImportProductOptions(Array.isArray(products) ? products : []);
+        setFilterTypes(filters);
       } catch {
         toast.error('Failed to load categories');
       }
@@ -513,6 +550,19 @@ const ProductForm = () => {
         setValue('mattresses', mattresses);
         setValue('faqs', faqs);
         setValue('dimensions', dimensions);
+        setValue('delivery_info', product.delivery_info || '');
+        setValue('returns_guarantee', product.returns_guarantee || '');
+        setValue('delivery_title', product.delivery_title || '');
+        setValue('returns_title', product.returns_title || '');
+        setValue('custom_info_sections', Array.isArray(product.custom_info_sections) ? product.custom_info_sections : []);
+        const filterValues = Array.isArray(product.filter_values)
+          ? product.filter_values
+              .map((fv) => ({
+                filter_option: fv.filter_option_id || null,
+              }))
+              .filter((fv) => fv.filter_option)
+          : [];
+        replaceFilterValues(filterValues);
         replaceImages(images);
         replaceVideos(videos);
         replaceColors(colors);
@@ -522,6 +572,7 @@ const ProductForm = () => {
         replaceMattresses(mattresses);
         replaceFaqs(faqs);
         replaceDimensions(dimensions);
+        replaceInfoSections(Array.isArray(product.custom_info_sections) ? product.custom_info_sections : []);
         setValue('features', product.features || []);
         setValue('delivery_info', product.delivery_info || '');
         setValue('returns_guarantee', product.returns_guarantee || '');
@@ -530,7 +581,7 @@ const ProductForm = () => {
       }
     };
     loadProduct();
-  }, [id, setValue, replaceImages, replaceVideos, replaceColors, replaceSizes, replaceStyles, replaceFabrics, replaceMattresses, replaceFaqs, replaceDimensions]);
+  }, [id, setValue, replaceImages, replaceVideos, replaceColors, replaceSizes, replaceStyles, replaceFabrics, replaceMattresses, replaceFaqs, replaceDimensions, replaceInfoSections, replaceFilterValues]);
 
   const handleUpload = async (file: File, onSuccess: (url: string) => void, inlineSvgPreferred = false) => {
     setIsUploading(true);
@@ -915,6 +966,20 @@ const ProductForm = () => {
           .filter((faq) => faq.question.length > 0 && faq.answer.length > 0),
         delivery_info: data.delivery_info?.trim() || '',
         returns_guarantee: data.returns_guarantee?.trim() || '',
+        delivery_title: (data.delivery_title || '').trim(),
+        returns_title: (data.returns_title || '').trim(),
+        custom_info_sections: (data.custom_info_sections || [])
+          .map((section) => ({
+            title: (section?.title || '').trim(),
+            content: (section?.content || '').trim(),
+          }))
+          .filter((section) => section.title || section.content),
+        filter_values: (data.filter_values || [])
+          .map((fv) => {
+            const id = Number(fv.filter_option);
+            return Number.isFinite(id) ? { filter_option: id } : null;
+          })
+          .filter(Boolean) as { filter_option: number }[],
       };
       if (!payload.images || payload.images.length === 0) {
         if (isEditing) {
@@ -2006,7 +2071,13 @@ const ProductForm = () => {
 
             <div className="grid gap-2">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <label className="text-sm font-medium">Delivery Information</label>
+                <div className="flex flex-col gap-1">
+                  <label className="text-sm font-medium">Delivery Information</label>
+                  <Input
+                    placeholder="Tab title (e.g., Delivery Information)"
+                    {...register('delivery_title')}
+                  />
+                </div>
                 <Button type="button" variant="outline" size="sm" onClick={importDeliveryInfoFromProduct}>
                   Import delivery
                 </Button>
@@ -2024,7 +2095,13 @@ const ProductForm = () => {
 
             <div className="grid gap-2">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <label className="text-sm font-medium">Returns & Guarantee</label>
+                <div className="flex flex-col gap-1">
+                  <label className="text-sm font-medium">Returns & Guarantee</label>
+                  <Input
+                    placeholder="Tab title (e.g., Returns & Guarantee)"
+                    {...register('returns_title')}
+                  />
+                </div>
                 <Button type="button" variant="outline" size="sm" onClick={importReturnsInfoFromProduct}>
                   Import returns/guarantee
                 </Button>
@@ -2038,6 +2115,102 @@ const ProductForm = () => {
                 className="flex min-h-30 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               />
               <p className="text-xs text-muted-foreground">Keep each policy on its own line; headings will stay separated when shown to shoppers.</p>
+            </div>
+
+            <div className="grid gap-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium">Additional Info Tabs</p>
+                  <p className="text-xs text-muted-foreground">Add custom titled sections that will appear as tabs on the product page.</p>
+                </div>
+                <Button type="button" variant="outline" size="sm" onClick={() => appendInfoSection({ title: '', content: '' })}>
+                  <Plus className="h-4 w-4 mr-2" /> Add Tab
+                </Button>
+              </div>
+              {infoSectionFields.length === 0 && (
+                <p className="text-xs text-muted-foreground">No extra tabs yet.</p>
+              )}
+              {infoSectionFields.map((field, index) => (
+                <div key={field.id} className="rounded-lg border border-border/70 p-3 space-y-2 bg-white">
+                  <div className="flex items-center gap-2">
+                    <Input
+                      placeholder="Tab title (e.g., Care Instructions)"
+                      {...register(`custom_info_sections.${index}.title` as const)}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => removeInfoSection(index)}
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
+                  <textarea
+                    {...register(`custom_info_sections.${index}.content` as const)}
+                    rows={4}
+                    placeholder="Tab content"
+                    className="flex min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  />
+                </div>
+              ))}
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium">Filters</p>
+                  <p className="text-xs text-muted-foreground">
+                    Optionally assign this product to filter options (e.g., Bed Size: King). All fields are optional.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => appendFilterValue({ filter_option: undefined })}
+                  disabled={filterTypes.length === 0}
+                >
+                  <Plus className="h-4 w-4 mr-2" /> Add Filter
+                </Button>
+              </div>
+              {filterTypes.length === 0 && (
+                <p className="text-xs text-muted-foreground">No filter types yet. Create them in the Filters or Categories page.</p>
+              )}
+              {filterValueFields.map((field, index) => {
+                const selected = watch(`filter_values.${index}.filter_option`);
+                return (
+                  <div key={field.id} className="flex items-center gap-2">
+                    <select
+                      className="w-full rounded-md border border-input px-3 py-2 text-sm bg-white"
+                      value={selected ?? ''}
+                      onChange={(e) =>
+                        setValue(
+                          `filter_values.${index}.filter_option`,
+                          e.target.value ? Number(e.target.value) : undefined
+                        )
+                      }
+                    >
+                      <option value="">Select filter option</option>
+                      {filterTypes.flatMap((ft) =>
+                        ft.options.map((opt) => (
+                          <option key={opt.id} value={opt.id}>
+                            {ft.name} — {opt.name}
+                          </option>
+                        ))
+                      )}
+                    </select>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => removeFilterValue(index)}
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
+                );
+              })}
             </div>
           </CardContent>
         </Card>
@@ -2054,3 +2227,4 @@ const ProductForm = () => {
 };
 
 export default ProductForm;
+
