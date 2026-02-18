@@ -36,15 +36,13 @@ const Categories = () => {
     display_order: 0,
     is_active: true,
   });
+  const [lastCreatedFilterTypeId, setLastCreatedFilterTypeId] = useState<number | null>(null);
   const [quickFilterForm, setQuickFilterForm] = useState({
     name: '',
-    slug: '',
     display_type: 'checkbox' as FilterType['display_type'],
     is_expanded_by_default: true,
   });
-  const [quickFilterOptions, setQuickFilterOptions] = useState<{ name: string; slug: string }[]>([
-    { name: '', slug: '' },
-  ]);
+  const [quickFilterOptions, setQuickFilterOptions] = useState<{ name: string }[]>([{ name: '' }]);
   const [isCreatingType, setIsCreatingType] = useState(false);
 
   const loadData = async () => {
@@ -112,7 +110,7 @@ const Categories = () => {
   const openFilterModal = (categoryId: number) => {
     setFilterTargetCategoryId(categoryId);
     setFilterForm({
-      filter_type: '',
+      filter_type: filterTypes[0] ? String(filterTypes[0].id) : '',
       subcategory: '',
       display_order: 0,
       is_active: true,
@@ -120,10 +118,78 @@ const Categories = () => {
     setShowFilterModal(true);
   };
 
+  // Creates a filter type from the quick form and returns it, or null on failure
+  const createFilterTypeFromQuickForm = async () => {
+    if (!quickFilterForm.name.trim()) {
+      toast.error('Filter name is required');
+      return null;
+    }
+    const payload = {
+      name: quickFilterForm.name.trim(),
+      slug: (quickFilterForm.name || '').toLowerCase().replace(/\s+/g, '-'),
+      display_type: quickFilterForm.display_type,
+      is_expanded_by_default: quickFilterForm.is_expanded_by_default,
+    };
+    try {
+      setIsCreatingType(true);
+      const created = await apiPost<FilterType>('/filter-types/', payload);
+      const optionPayloads = quickFilterOptions
+        .map((opt, idx) => ({
+          name: (opt.name || '').trim(),
+          slug: (opt.name || '').toLowerCase().replace(/\s+/g, '-'),
+          filter_type: created.id,
+          display_order: idx,
+        }))
+        .filter((opt) => opt.name.length > 0);
+      if (optionPayloads.length > 0) {
+        await Promise.all(optionPayloads.map((opt) => apiPost('/filter-options/', opt)));
+      }
+      setLastCreatedFilterTypeId(created.id || null);
+      setFilterForm((prev) => ({ ...prev, filter_type: String(created.id || '') }));
+      setQuickFilterForm({
+        name: '',
+        display_type: 'checkbox',
+        is_expanded_by_default: true,
+      });
+      setQuickFilterOptions([{ name: '' }]);
+      return created;
+    } catch {
+      toast.error('Failed to create filter type');
+      return null;
+    } finally {
+      setIsCreatingType(false);
+    }
+  };
+
   const handleSaveFilter = async () => {
-    const filterTypeId = Number(filterForm.filter_type) || null;
-    if (!filterTargetCategoryId || !filterTypeId) {
-      toast.error('Select a filter type');
+    const quickName = quickFilterForm.name.trim();
+    const selectedFilterType = filterTypes.find((ft) => Number(ft.id) === Number(filterForm.filter_type));
+
+    // Prefer an exact name match (case-insensitive) if the user typed a quick name.
+    const existingByName = quickName
+      ? filterTypes.find((ft) => ft.name.trim().toLowerCase() === quickName.toLowerCase())
+      : undefined;
+
+    let chosenFilterTypeId =
+      existingByName?.id ||
+      Number(filterForm.filter_type) ||
+      lastCreatedFilterTypeId ||
+      (filterTypes[0]?.id ?? null);
+
+    const needCreateFromQuickName =
+      quickName.length > 0 &&
+      (!existingByName && (!selectedFilterType || selectedFilterType.name.trim().toLowerCase() !== quickName.toLowerCase()));
+
+    if (needCreateFromQuickName) {
+      const created = await createFilterTypeFromQuickForm();
+      if (created?.id) {
+        chosenFilterTypeId = created.id;
+        toast.success('Filter type created');
+      }
+    }
+
+    if (!filterTargetCategoryId || !chosenFilterTypeId) {
+      toast.error('Select or create a filter type first.');
       return;
     }
 
@@ -131,7 +197,7 @@ const Categories = () => {
     const payload = {
       category: subcategoryId ? null : filterTargetCategoryId,
       subcategory: subcategoryId,
-      filter_type: filterTypeId,
+      filter_type: chosenFilterTypeId,
       display_order: Number(filterForm.display_order) || 0,
       is_active: filterForm.is_active,
     };
@@ -150,48 +216,10 @@ const Categories = () => {
   };
 
   const handleQuickCreateFilterType = async () => {
-    if (!quickFilterForm.name.trim()) {
-      toast.error('Filter name is required');
-      return;
-    }
-    const payload = {
-      name: quickFilterForm.name.trim(),
-      slug: (quickFilterForm.slug || quickFilterForm.name).toLowerCase().replace(/\s+/g, '-'),
-      display_type: quickFilterForm.display_type,
-      is_expanded_by_default: quickFilterForm.is_expanded_by_default,
-    };
-    try {
-      setIsCreatingType(true);
-      const created = await apiPost<FilterType>('/filter-types/', payload);
-      // create options if provided
-      const optionPayloads = quickFilterOptions
-        .map((opt, idx) => ({
-          name: (opt.name || '').trim(),
-          slug: (opt.slug || opt.name || '').toLowerCase().replace(/\s+/g, '-'),
-          filter_type: created.id,
-          display_order: idx,
-        }))
-        .filter((opt) => opt.name.length > 0);
-      if (optionPayloads.length > 0) {
-        await Promise.all(
-          optionPayloads.map((opt) => apiPost('/filter-options/', opt))
-        );
-      }
-      toast.success('Filter type created');
-      await loadData();
-      setFilterForm((prev) => ({ ...prev, filter_type: String(created.id) }));
-      setQuickFilterForm({
-        name: '',
-        slug: '',
-        display_type: 'checkbox',
-        is_expanded_by_default: true,
-      });
-      setQuickFilterOptions([{ name: '', slug: '' }]);
-    } catch {
-      toast.error('Failed to create filter type');
-    } finally {
-      setIsCreatingType(false);
-    }
+    const created = await createFilterTypeFromQuickForm();
+    if (!created) return;
+    toast.success('Filter type created');
+    await loadData();
   };
 
   const handleDeleteCategoryFilter = async (id: number) => {
@@ -323,13 +351,21 @@ const Categories = () => {
 
   const filtersForCategory = (category: Category) => {
     const subIds = new Set((category.subcategories || []).map((s) => s.id));
-    return categoryFilters.filter(
-      (cf) => cf.category === category.id || (cf.subcategory && subIds.has(cf.subcategory))
-    );
+    return categoryFilters
+      .filter((cf) => cf.category === category.id || (cf.subcategory && subIds.has(cf.subcategory)))
+      .map((cf) => {
+        const resolvedName = getFilterTypeName(cf.filter_type, cf.filter_type_name);
+        return { ...cf, filter_type_name: resolvedName };
+      });
   };
 
-  const getFilterTypeName = (id?: number) =>
-    filterTypes.find((ft) => ft.id === id)?.name || `Filter #${id}`;
+  const getFilterTypeName = (id?: number, fallbackName?: string) => {
+    const targetId = id == null ? null : Number(id);
+    const liveName = filterTypes.find((ft) => Number(ft.id) === targetId)?.name;
+    if (liveName && liveName.trim()) return liveName;
+    if (fallbackName && fallbackName.trim()) return fallbackName;
+    return `Filter #${id}`;
+  };
 
   const getSubcategoryName = (id?: number) =>
     categories
@@ -439,7 +475,7 @@ const Categories = () => {
                           key={cf.id}
                           className="inline-flex items-center gap-2 rounded-full border border-border bg-white px-3 py-1 text-sm"
                         >
-                          {getFilterTypeName(cf.filter_type)}
+                          {getFilterTypeName(cf.filter_type, cf.filter_type_name)}
                           {cf.subcategory && (
                             <span className="text-xs text-muted-foreground">
                               • {getSubcategoryName(cf.subcategory) || 'Subcategory'}
@@ -514,7 +550,7 @@ const Categories = () => {
 
       {showCategoryModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <Card className="w-full max-w-md">
+          <Card className="w-full max-w-2xl">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle>{editingCategory ? 'Edit Category' : 'Add New Category'}</CardTitle>
@@ -547,7 +583,7 @@ const Categories = () => {
 
       {showFilterModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <Card className="w-full max-w-md">
+          <Card className="w-full max-w-4xl max-h-[90vh] overflow-y-auto">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle>Add Filter to Category</CardTitle>
@@ -557,25 +593,8 @@ const Categories = () => {
               </div>
             </CardHeader>
             <CardContent className="space-y-5">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Filter Type</label>
-                  <select
-                    className="w-full rounded-md border border-input px-3 py-2 text-sm bg-white"
-                    value={filterForm.filter_type}
-                    onChange={(e) => setFilterForm({ ...filterForm, filter_type: e.target.value })}
-                  >
-                    <option value="">Select filter</option>
-                    {filterTypes.map((ft) => (
-                      <option key={ft.id} value={ft.id}>
-                        {ft.name}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="text-xs text-muted-foreground">Pick an existing filter or create one on the right.</p>
-                </div>
-
-                <div className="rounded-md border border-border bg-white p-3 shadow-sm space-y-3">
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="rounded-md border border-border bg-white p-3 shadow-sm space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-semibold">Quick create filter type</span>
                     <Button
@@ -594,15 +613,7 @@ const Categories = () => {
                       setQuickFilterForm({
                         ...quickFilterForm,
                         name: e.target.value,
-                        slug: e.target.value.toLowerCase().replace(/\s+/g, '-'),
                       })
-                    }
-                  />
-                  <Input
-                    placeholder="Slug (e.g., bed-size)"
-                    value={quickFilterForm.slug}
-                    onChange={(e) =>
-                      setQuickFilterForm({ ...quickFilterForm, slug: e.target.value })
                     }
                   />
                   <div className="grid gap-2">
@@ -629,39 +640,23 @@ const Categories = () => {
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => setQuickFilterOptions((prev) => [...prev, { name: '', slug: '' }])}
+                        onClick={() => setQuickFilterOptions((prev) => [...prev, { name: '' }])}
                       >
                         <Plus className="h-4 w-4 mr-1" /> Add
                       </Button>
                     </div>
                     <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
                       {quickFilterOptions.map((opt, idx) => (
-                        <div key={idx} className="flex items-center gap-2">
+                        <div key={idx} className="flex flex-col gap-2 rounded-md border border-border/60 bg-muted/30 p-2">
                           <Input
-                            className="flex-1"
-                            placeholder={`Option ${idx + 1} (e.g., King)`}
+                            className="w-full"
+                            placeholder={`Option ${idx + 1}`}
                             value={opt.name}
                             onChange={(e) => {
                               const value = e.target.value;
                               setQuickFilterOptions((prev) => {
                                 const next = [...prev];
-                                next[idx] = {
-                                  name: value,
-                                  slug: prev[idx].slug || value.toLowerCase().replace(/\s+/g, '-'),
-                                };
-                                return next;
-                              });
-                            }}
-                          />
-                          <Input
-                            className="w-40"
-                            placeholder="Slug"
-                            value={opt.slug}
-                            onChange={(e) => {
-                              const value = e.target.value;
-                              setQuickFilterOptions((prev) => {
-                                const next = [...prev];
-                                next[idx] = { ...next[idx], slug: value };
+                                next[idx] = { name: value };
                                 return next;
                               });
                             }}
@@ -670,15 +665,16 @@ const Categories = () => {
                             type="button"
                             variant="ghost"
                             size="icon"
+                            className="h-9 w-9 text-destructive hover:text-destructive/80 hover:bg-destructive/10"
                             onClick={() =>
                               setQuickFilterOptions((prev) =>
                                 prev.length === 1
-                                  ? [{ name: '', slug: '' }]
+                                  ? [{ name: '' }]
                                   : prev.filter((_, i) => i !== idx)
                               )
                             }
                           >
-                            <Trash2 className="h-4 w-4 text-destructive" />
+                            <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
                       ))}
@@ -760,7 +756,7 @@ const Categories = () => {
 
       {showSubCategoryModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+          <Card className="w-full max-w-3xl max-h-[90vh] overflow-y-auto">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle>{editingSubCategory ? 'Edit Subcategory' : 'Add New Subcategory'}</CardTitle>

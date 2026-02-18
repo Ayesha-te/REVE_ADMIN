@@ -1,4 +1,4 @@
-import { zodResolver } from '@hookform/resolvers/zod';
+﻿import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -10,7 +10,7 @@ import { useEffect, useState } from 'react';
 import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import type { FieldErrors } from 'react-hook-form';
 import { apiGet, apiPost, apiPut, apiUpload } from '../lib/api';
-import type { Category, Product, ProductDimensionRow, SubCategory, FilterType } from '../lib/types';
+import type { Category, Product, ProductDimensionRow, SubCategory, FilterType, FilterOption } from '../lib/types';
 
 const DIMENSION_SIZE_COLUMNS = [
   '2ft6 Small Single',
@@ -287,6 +287,8 @@ const ProductForm = () => {
   const [importProductOptions, setImportProductOptions] = useState<Product[]>([]);
   const [selectedImportProductId, setSelectedImportProductId] = useState<number | null>(null);
   const [filterTypes, setFilterTypes] = useState<FilterType[]>([]);
+  const [filterOptions, setFilterOptions] = useState<FilterOption[]>([]);
+  const [categoryFilterOptions, setCategoryFilterOptions] = useState<FilterOption[]>([]);
 
   const { register, control, handleSubmit, formState: { errors }, setValue, watch } = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
@@ -318,6 +320,7 @@ const ProductForm = () => {
 
   // Define watched values early for use in effects
   const selectedCategory = watch('category');
+  const selectedSubcategory = watch('subcategory');
   const featuresValue = (watch('features') || []).join('\n');
   const availableSubcategories = subcategories.filter((s) => s.category === selectedCategory);
   const watchPrice = watch('price');
@@ -438,22 +441,67 @@ const ProductForm = () => {
   useEffect(() => {
     const load = async () => {
       try {
-        const [cats, subs, products, filters] = await Promise.all([
+        const [cats, subs, products, filters, options] = await Promise.all([
           apiGet<Category[]>('/categories/'),
           apiGet<SubCategory[]>('/subcategories/'),
           apiGet<Product[]>('/products/'),
           apiGet<FilterType[]>('/filter-types/'),
+          apiGet<FilterOption[]>('/filter-options/'),
         ]);
         setCategories(cats);
         setSubcategories(subs);
         setImportProductOptions(Array.isArray(products) ? products : []);
-        setFilterTypes(filters);
+        setFilterTypes(filters || []);
+        setFilterOptions((options || []).filter((opt) => opt.is_active !== false));
       } catch {
         toast.error('Failed to load categories');
       }
     };
     load();
   }, []);
+
+  // Load filter options tied to the selected category (and optional subcategory)
+  useEffect(() => {
+    const loadCategoryFilters = async () => {
+      const category = categories.find((c) => c.id === selectedCategory);
+      if (!category) {
+        setCategoryFilterOptions([]);
+        return;
+      }
+      try {
+        const query = selectedSubcategory ? `?subcategory=${selectedSubcategory}` : '';
+        const [catRes, typesRes, optsRes] = await Promise.all([
+          apiGet<{ filters: FilterType[] }>(`/categories/${category.slug}/filters/${query}`),
+          apiGet<FilterType[]>('/filter-types/'),
+          apiGet<FilterOption[]>('/filter-options/'),
+        ]);
+
+        const activeTypes = (typesRes || []).filter((ft) => ft.is_active !== false);
+        const activeTypeIds = new Set(activeTypes.map((ft) => ft.id));
+        setFilterTypes(activeTypes);
+
+        setFilterOptions(
+          (optsRes || []).filter(
+            (opt) => opt.is_active !== false && (!opt.filter_type || activeTypeIds.has(opt.filter_type))
+          )
+        );
+
+        const filters = Array.isArray(catRes?.filters) ? catRes.filters : [];
+        const opts = filters.flatMap((ft) =>
+          (ft.options || []).map((opt) => ({
+            ...opt,
+            filter_type: ft.id,
+            filter_type_name: ft.name,
+          }))
+        );
+        setCategoryFilterOptions(opts);
+      } catch (err) {
+        console.error('Failed to load category filters', err);
+        setCategoryFilterOptions([]);
+      }
+    };
+    loadCategoryFilters();
+  }, [categories, selectedCategory, selectedSubcategory]);
 
   useEffect(() => {
     const loadLibrary = async () => {
@@ -877,6 +925,10 @@ const ProductForm = () => {
       const computedOriginalPrice = Number.isFinite(computedOriginalPriceRaw) ? computedOriginalPriceRaw : null;
       const payload: ProductFormValues = {
         ...data,
+        category: Number.isFinite(Number(data.category)) ? Number(data.category) : undefined,
+        subcategory: Number.isFinite(Number(data.subcategory)) && Number(data.subcategory) > 0
+          ? Number(data.subcategory)
+          : null,
         price: Number.isFinite(data.price) ? data.price : 0,
         delivery_charges: Number.isFinite(data.delivery_charges ?? null)
           ? Number(data.delivery_charges)
@@ -988,7 +1040,7 @@ const ProductForm = () => {
         filter_values: (data.filter_values || [])
           .map((fv) => {
             const id = Number(fv.filter_option);
-            return Number.isFinite(id) ? { filter_option: id } : null;
+            return Number.isFinite(id) && id > 0 ? { filter_option: id } : null;
           })
           .filter(Boolean) as { filter_option: number }[],
       };
@@ -1138,7 +1190,7 @@ const ProductForm = () => {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <label className="text-sm font-medium">Price (£) *</label>
+                <label className="text-sm font-medium">Price (Â£) *</label>
                 <Input type="number" {...register('price', { valueAsNumber: true })} />
                 {errors.price && <p className="text-xs text-destructive">{errors.price.message}</p>}
               </div>
@@ -1191,7 +1243,7 @@ const ProductForm = () => {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <label className="text-sm font-medium">Delivery Charges (£)</label>
+                <label className="text-sm font-medium">Delivery Charges (Â£)</label>
                 <Input type="number" {...register('delivery_charges', { valueAsNumber: true })} />
               </div>
               <div className="grid gap-2">
@@ -1860,7 +1912,7 @@ const ProductForm = () => {
                         </div>
                         <Input
                           className="col-span-2"
-                          placeholder="+£0"
+                          placeholder="+Â£0"
                           type="text"
                           inputMode="decimal"
                           value={option.price_delta ?? 0}
@@ -1942,8 +1994,8 @@ const ProductForm = () => {
                 defaultValue={featuresValue}
                 onBlur={(e) => {
                   const features = e.target.value
-                    .split(/[\r\n]+|•/g)
-                    .map((f) => f.trim().replace(/^[\\-–—•]+\\s*/, ''))
+                    .split(/[\r\n]+|â€¢/g)
+                    .map((f) => f.trim().replace(/^[\\-â€“â€”â€¢]+\\s*/, ''))
                     .filter(Boolean);
                   setValue('features', features);
                 }}
@@ -2197,49 +2249,80 @@ const ProductForm = () => {
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => appendFilterValue({ filter_option: undefined })}
-                  disabled={filterTypes.length === 0}
+                  onClick={() => replaceFilterValues([])}
+                  disabled={(categoryFilterOptions.length === 0 && filterOptions.length === 0)}
                 >
-                  <Plus className="h-4 w-4 mr-2" /> Add Filter
+                  Clear
                 </Button>
               </div>
-              {filterTypes.length === 0 && (
-                <p className="text-xs text-muted-foreground">No filter types yet. Create them in the Filters or Categories page.</p>
+              {categoryFilterOptions.length === 0 && filterOptions.length === 0 && (
+                <p className="text-xs text-muted-foreground">No filter options yet. Create them in the Filters or Categories page.</p>
               )}
-              {filterValueFields.map((field, index) => {
-                const selected = watch(`filter_values.${index}.filter_option` as const);
+              {(() => {
+                const selectedIds = new Set(
+                  (watch('filter_values') || [])
+                    .map((fv) => fv.filter_option)
+                    .filter((v) => v !== undefined && v !== null)
+                    .map((v) => Number(v))
+                );
+
+                const optionList =
+                  categoryFilterOptions.length > 0
+                    ? categoryFilterOptions
+                        .filter((opt) => opt.is_active !== false)
+                        .map((opt) => ({
+                          id: opt.id,
+                          label: `${opt.filter_type_name || 'Filter'} — ${opt.name}`,
+                        }))
+                    : filterOptions.length > 0
+                    ? filterOptions
+                        .filter((opt) => opt.is_active !== false)
+                        .map((opt) => ({
+                          id: opt.id,
+                          label: `${opt.filter_type_name || 'Filter'} — ${opt.name}`,
+                        }))
+                    : filterTypes
+                        .filter((ft) => ft.is_active !== false)
+                        .flatMap((ft) =>
+                          (ft.options || [])
+                            .filter((opt) => opt.is_active !== false)
+                            .map((opt) => ({
+                              id: opt.id,
+                              label: `${ft.name} — ${opt.name}`,
+                            }))
+                        );
+
+                const toggleId = (id: number, checked: boolean) => {
+                  const next = new Set(selectedIds);
+                  if (checked) {
+                    next.add(id);
+                  } else {
+                    next.delete(id);
+                  }
+                  replaceFilterValues(Array.from(next).map((val) => ({ filter_option: val })));
+                };
+
                 return (
-                  <div key={field.id} className="flex items-center gap-2">
-                    <select
-                      className="w-full rounded-md border border-input px-3 py-2 text-sm bg-white"
-                      value={selected ?? ''}
-                      onChange={(e) =>
-                        setValue(
-                          `filter_values.${index}.filter_option` as const,
-                          e.target.value ? Number(e.target.value) : undefined
-                        )
-                      }
-                    >
-                      <option value="">Select filter option</option>
-                      {filterTypes.flatMap((ft) =>
-                        ft.options.map((opt) => (
-                          <option key={opt.id} value={opt.id}>
-                            {ft.name} — {opt.name}
-                          </option>
-                        ))
+                  <div className="flex flex-col gap-2">
+                    <div className="max-h-56 overflow-y-auto rounded-md border border-input bg-white px-3 py-2 space-y-2">
+                      {optionList.map((opt) => (
+                        <label key={opt.id} className="flex items-center gap-2 text-sm">
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.has(opt.id)}
+                            onChange={(e) => toggleId(opt.id, e.target.checked)}
+                          />
+                          <span>{opt.label}</span>
+                        </label>
+                      ))}
+                      {optionList.length === 0 && (
+                        <p className="text-xs text-muted-foreground">No filter options available.</p>
                       )}
-                    </select>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => removeFilterValue(index)}
-                    >
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">Tick the options that apply to this product.</p>
                   </div>
                 );
-              })}
+              })()}
             </div>
           </CardContent>
         </Card>
@@ -2256,4 +2339,5 @@ const ProductForm = () => {
 };
 
 export default ProductForm;
+
 

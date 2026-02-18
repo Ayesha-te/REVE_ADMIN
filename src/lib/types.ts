@@ -178,6 +178,8 @@ export interface FilterOption {
   name: string;
   slug: string;
   color_code?: string;
+  filter_type?: number;
+  filter_type_name?: string;
   display_order: number;
   is_active: boolean;
   product_count?: number;
