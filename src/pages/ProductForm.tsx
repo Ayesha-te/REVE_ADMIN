@@ -89,6 +89,7 @@ const createProductSchema = (requireImages: boolean) =>
     delivery_charges: z.number().min(0).optional().nullable(),
     is_bestseller: z.boolean().optional(),
     is_new: z.boolean().optional(),
+    show_size_icons: z.boolean().optional(),
     images: z.array(z.object({ url: z.string().optional().nullable() })).optional(),
     videos: z.array(z.object({ url: z.string().optional().nullable() })).optional(),
     colors: z.array(z.object({ name: z.string().optional(), hex_code: z.string().optional(), image_url: z.string().optional() })).optional(),
@@ -293,6 +294,7 @@ const ProductForm = () => {
       mattresses: [],
       is_bestseller: false,
       is_new: false,
+      show_size_icons: true,
       discount_percentage: 0,
       delivery_charges: 0,
       features: [],
@@ -490,6 +492,7 @@ const ProductForm = () => {
         setValue('delivery_charges', Number(product.delivery_charges) || 0);
         setValue('is_bestseller', product.is_bestseller);
         setValue('is_new', product.is_new);
+        setValue('show_size_icons', product.show_size_icons !== false);
         const images = product.images.map((i) => ({ url: i.url }));
         const videos = product.videos.map((v) => ({ url: v.url }));
         const colors = product.colors.map((c) => ({
@@ -871,6 +874,7 @@ const ProductForm = () => {
         delivery_charges: Number.isFinite(data.delivery_charges ?? null)
           ? Number(data.delivery_charges)
           : 0,
+        show_size_icons: data.show_size_icons !== false,
         short_description: data.short_description.trim(),
         description: data.description.trim(),
         discount_percentage: Number.isFinite(discountPercentage) ? discountPercentage : 0,
@@ -1369,6 +1373,24 @@ const ProductForm = () => {
                 <Button type="button" variant="outline" size="sm" onClick={() => appendSize({ name: '', description: '', price_delta: 0 })}>
                   <Plus className="h-4 w-4 mr-2" /> Add Size
                 </Button>
+              </div>
+              <div className="flex items-center gap-2">
+                <Controller
+                  name="show_size_icons"
+                  control={control}
+                  render={({ field }) => (
+                    <input
+                      type="checkbox"
+                      id="show_size_icons"
+                      checked={field.value !== false}
+                      onChange={(e) => field.onChange(e.target.checked)}
+                      className="h-4 w-4 rounded border-gray-300"
+                    />
+                  )}
+                />
+                <label htmlFor="show_size_icons" className="text-sm font-medium cursor-pointer">
+                  Show icons next to size options
+                </label>
               </div>
               <div className="space-y-2">
                 {sizeFields.map((field, index) => (
