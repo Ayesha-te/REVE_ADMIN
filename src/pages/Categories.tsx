@@ -42,6 +42,9 @@ const Categories = () => {
     display_type: 'checkbox' as FilterType['display_type'],
     is_expanded_by_default: true,
   });
+  const [quickFilterOptions, setQuickFilterOptions] = useState<{ name: string; slug: string }[]>([
+    { name: '', slug: '' },
+  ]);
   const [isCreatingType, setIsCreatingType] = useState(false);
 
   const loadData = async () => {
@@ -160,6 +163,20 @@ const Categories = () => {
     try {
       setIsCreatingType(true);
       const created = await apiPost<FilterType>('/filter-types/', payload);
+      // create options if provided
+      const optionPayloads = quickFilterOptions
+        .map((opt, idx) => ({
+          name: (opt.name || '').trim(),
+          slug: (opt.slug || opt.name || '').toLowerCase().replace(/\s+/g, '-'),
+          filter_type: created.id,
+          display_order: idx,
+        }))
+        .filter((opt) => opt.name.length > 0);
+      if (optionPayloads.length > 0) {
+        await Promise.all(
+          optionPayloads.map((opt) => apiPost('/filter-options/', opt))
+        );
+      }
       toast.success('Filter type created');
       await loadData();
       setFilterForm((prev) => ({ ...prev, filter_type: String(created.id) }));
@@ -169,6 +186,7 @@ const Categories = () => {
         display_type: 'checkbox',
         is_expanded_by_default: true,
       });
+      setQuickFilterOptions([{ name: '', slug: '' }]);
     } catch {
       toast.error('Failed to create filter type');
     } finally {
@@ -604,6 +622,71 @@ const Categories = () => {
                       <option value="radio">Radio buttons</option>
                       <option value="dropdown">Dropdown</option>
                     </select>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm font-medium">Options</label>
+                      <Button
+                        size="icon"
+                        variant="outline"
+                        onClick={() => setQuickFilterOptions((prev) => [...prev, { name: '', slug: '' }])}
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                      {quickFilterOptions.map((opt, idx) => (
+                        <div key={idx} className="grid grid-cols-8 gap-2">
+                          <Input
+                            className="col-span-4"
+                            placeholder={`Option ${idx + 1} (e.g., King)`}
+                            value={opt.name}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              setQuickFilterOptions((prev) => {
+                                const next = [...prev];
+                                next[idx] = {
+                                  name: value,
+                                  slug: prev[idx].slug || value.toLowerCase().replace(/\s+/g, '-'),
+                                };
+                                return next;
+                              });
+                            }}
+                          />
+                          <Input
+                            className="col-span-3"
+                            placeholder="Slug"
+                            value={opt.slug}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              setQuickFilterOptions((prev) => {
+                                const next = [...prev];
+                                next[idx] = { ...next[idx], slug: value };
+                                return next;
+                              });
+                            }}
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="col-span-1"
+                            onClick={() =>
+                              setQuickFilterOptions((prev) =>
+                                prev.length === 1
+                                  ? [{ name: '', slug: '' }]
+                                  : prev.filter((_, i) => i !== idx)
+                              )
+                            }
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Add option names (e.g., Small Single, Double, King). Slugs auto-fill.
+                    </p>
                   </div>
                   <label className="flex items-center gap-2 text-sm">
                     <input
