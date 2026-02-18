@@ -627,18 +627,18 @@ const Categories = () => {
                     <div className="flex items-center justify-between">
                       <label className="text-sm font-medium">Options</label>
                       <Button
-                        size="icon"
+                        size="sm"
                         variant="outline"
                         onClick={() => setQuickFilterOptions((prev) => [...prev, { name: '', slug: '' }])}
                       >
-                        <Plus className="h-4 w-4" />
+                        <Plus className="h-4 w-4 mr-1" /> Add
                       </Button>
                     </div>
-                    <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                    <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
                       {quickFilterOptions.map((opt, idx) => (
-                        <div key={idx} className="grid grid-cols-8 gap-2">
+                        <div key={idx} className="flex items-center gap-2">
                           <Input
-                            className="col-span-4"
+                            className="flex-1"
                             placeholder={`Option ${idx + 1} (e.g., King)`}
                             value={opt.name}
                             onChange={(e) => {
@@ -654,7 +654,7 @@ const Categories = () => {
                             }}
                           />
                           <Input
-                            className="col-span-3"
+                            className="w-40"
                             placeholder="Slug"
                             value={opt.slug}
                             onChange={(e) => {
@@ -670,7 +670,6 @@ const Categories = () => {
                             type="button"
                             variant="ghost"
                             size="icon"
-                            className="col-span-1"
                             onClick={() =>
                               setQuickFilterOptions((prev) =>
                                 prev.length === 1
