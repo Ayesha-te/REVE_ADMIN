@@ -183,6 +183,13 @@ const createProductSchema = (requireImages: boolean) =>
         })
       )
       .optional(),
+    filter_values: z
+      .array(
+        z.object({
+          filter_option: z.number().optional().nullable(),
+        })
+      )
+      .optional(),
   })
   .superRefine((values, ctx) => {
     if (!requireImages) return;
@@ -2200,7 +2207,7 @@ const ProductForm = () => {
                 <p className="text-xs text-muted-foreground">No filter types yet. Create them in the Filters or Categories page.</p>
               )}
               {filterValueFields.map((field, index) => {
-                const selected = watch(`filter_values.${index}.filter_option`);
+                const selected = watch(`filter_values.${index}.filter_option` as const);
                 return (
                   <div key={field.id} className="flex items-center gap-2">
                     <select
@@ -2208,7 +2215,7 @@ const ProductForm = () => {
                       value={selected ?? ''}
                       onChange={(e) =>
                         setValue(
-                          `filter_values.${index}.filter_option`,
+                          `filter_values.${index}.filter_option` as const,
                           e.target.value ? Number(e.target.value) : undefined
                         )
                       }
