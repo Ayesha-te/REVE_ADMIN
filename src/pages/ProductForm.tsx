@@ -419,9 +419,6 @@ const ProductForm = () => {
   });
 
   const {
-    fields: filterValueFields,
-    append: appendFilterValue,
-    remove: removeFilterValue,
     replace: replaceFilterValues,
   } = useFieldArray({
     control,
@@ -925,7 +922,7 @@ const ProductForm = () => {
       const computedOriginalPrice = Number.isFinite(computedOriginalPriceRaw) ? computedOriginalPriceRaw : null;
       const payload: ProductFormValues = {
         ...data,
-        category: Number.isFinite(Number(data.category)) ? Number(data.category) : undefined,
+        category: Number(data.category),
         subcategory: Number.isFinite(Number(data.subcategory)) && Number(data.subcategory) > 0
           ? Number(data.subcategory)
           : null,
