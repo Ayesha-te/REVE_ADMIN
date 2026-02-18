@@ -36,6 +36,13 @@ const Categories = () => {
     display_order: 0,
     is_active: true,
   });
+  const [quickFilterForm, setQuickFilterForm] = useState({
+    name: '',
+    slug: '',
+    display_type: 'checkbox' as FilterType['display_type'],
+    is_expanded_by_default: true,
+  });
+  const [isCreatingType, setIsCreatingType] = useState(false);
 
   const loadData = async () => {
     try {
@@ -136,6 +143,36 @@ const Categories = () => {
       toast.error('Failed to assign filter');
     } finally {
       setIsSavingFilter(false);
+    }
+  };
+
+  const handleQuickCreateFilterType = async () => {
+    if (!quickFilterForm.name.trim()) {
+      toast.error('Filter name is required');
+      return;
+    }
+    const payload = {
+      name: quickFilterForm.name.trim(),
+      slug: (quickFilterForm.slug || quickFilterForm.name).toLowerCase().replace(/\s+/g, '-'),
+      display_type: quickFilterForm.display_type,
+      is_expanded_by_default: quickFilterForm.is_expanded_by_default,
+    };
+    try {
+      setIsCreatingType(true);
+      const created = await apiPost<FilterType>('/filter-types/', payload);
+      toast.success('Filter type created');
+      await loadData();
+      setFilterForm((prev) => ({ ...prev, filter_type: String(created.id) }));
+      setQuickFilterForm({
+        name: '',
+        slug: '',
+        display_type: 'checkbox',
+        is_expanded_by_default: true,
+      });
+    } catch {
+      toast.error('Failed to create filter type');
+    } finally {
+      setIsCreatingType(false);
     }
   };
 
@@ -516,6 +553,72 @@ const Categories = () => {
                     </option>
                   ))}
                 </select>
+              </div>
+
+              <div className="rounded-md border border-border/70 bg-muted/40 p-3 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold">Quick create filter type</span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleQuickCreateFilterType}
+                    disabled={isCreatingType}
+                  >
+                    {isCreatingType ? 'Saving...' : 'Create'}
+                  </Button>
+                </div>
+                <Input
+                  placeholder="Name (e.g., Bed Size)"
+                  value={quickFilterForm.name}
+                  onChange={(e) =>
+                    setQuickFilterForm({
+                      ...quickFilterForm,
+                      name: e.target.value,
+                      slug: e.target.value.toLowerCase().replace(/\s+/g, '-'),
+                    })
+                  }
+                />
+                <Input
+                  placeholder="Slug (e.g., bed-size)"
+                  value={quickFilterForm.slug}
+                  onChange={(e) =>
+                    setQuickFilterForm({ ...quickFilterForm, slug: e.target.value })
+                  }
+                />
+                <div className="grid gap-2">
+                  <label className="text-sm font-medium">Display Type</label>
+                  <select
+                    className="w-full rounded-md border border-input px-3 py-2 text-sm bg-white"
+                    value={quickFilterForm.display_type}
+                    onChange={(e) =>
+                      setQuickFilterForm({
+                        ...quickFilterForm,
+                        display_type: e.target.value as FilterType['display_type'],
+                      })
+                    }
+                  >
+                    <option value="checkbox">Checkbox list</option>
+                    <option value="color_swatch">Color swatch</option>
+                    <option value="radio">Radio buttons</option>
+                    <option value="dropdown">Dropdown</option>
+                  </select>
+                </div>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={quickFilterForm.is_expanded_by_default}
+                    onChange={(e) =>
+                      setQuickFilterForm({
+                        ...quickFilterForm,
+                        is_expanded_by_default: e.target.checked,
+                      })
+                    }
+                  />
+                  Expanded by default
+                </label>
+                <p className="text-xs text-muted-foreground">
+                  Create a filter type here, then it will appear in the list above automatically.
+                </p>
               </div>
 
               <div className="space-y-2">
