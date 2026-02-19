@@ -6,6 +6,7 @@ import { Edit, Trash2, Plus, X, ChevronDown, ChevronRight, FolderPlus, Filter } 
 import { toast } from 'sonner';
 import { apiDelete, apiGet, apiPost, apiPut, apiUpload } from '../lib/api';
 import type { Category, Product, SubCategory, FilterType, CategoryFilter } from '../lib/types';
+import { Link } from 'react-router-dom';
 
 const Categories = () => {
   const [categories, setCategories] = useState<Category[]>([]);
@@ -481,6 +482,14 @@ const Categories = () => {
                               • {getSubcategoryName(cf.subcategory) || 'Subcategory'}
                             </span>
                           )}
+                          <Link
+                            to="/filters"
+                            className="text-muted-foreground hover:text-primary"
+                            title="Edit filter type & options"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Link>
                           <button
                             type="button"
                             onClick={() => handleDeleteCategoryFilter(cf.id)}
