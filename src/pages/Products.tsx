@@ -43,8 +43,17 @@ const Products = () => {
 
   const filteredProducts = useMemo(() => {
     if (selectedCategoryId === 'all') return products;
-    return products.filter((product) => Number(product.category) === Number(selectedCategoryId));
-  }, [products, selectedCategoryId]);
+    const selectedCategory = categories.find((c) => Number(c.id) === Number(selectedCategoryId));
+    const selectedName = (selectedCategory?.name || '').toLowerCase();
+    return products.filter((product) => {
+      const productCategoryId = Number(product.category);
+      const productCategoryName = (product.category_name || '').toLowerCase();
+      return (
+        productCategoryId === Number(selectedCategoryId) ||
+        (selectedName && productCategoryName === selectedName)
+      );
+    });
+  }, [products, categories, selectedCategoryId]);
 
   return (
     <div className="space-y-6">
@@ -128,6 +137,13 @@ const Products = () => {
                   </TableCell>
                 </TableRow>
               ))}
+              {filteredProducts.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center text-sm text-muted-foreground py-6">
+                    No products found for this category.
+                  </TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
         </CardContent>
