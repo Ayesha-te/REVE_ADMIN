@@ -29,6 +29,8 @@ const Filters = () => {
     slug: '',
     color_code:     '',
   });
+  const [editingOption, setEditingOption] = useState<{ typeId: number; optionId: number } | null>(null);
+  const [optionEditData, setOptionEditData] = useState({ name: '', slug: '', color_code: '' });
 
   const [categoryFilterForm, setCategoryFilterForm] = useState({
     category: '',
@@ -156,6 +158,40 @@ const Filters = () => {
       loadData();
     } catch (error) {
       toast.error('Failed to add filter option');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const startEditingOption = (typeId: number, option: { id: number; name: string; slug: string; color_code?: string | null }) => {
+    setEditingOption({ typeId, optionId: option.id });
+    setOptionEditData({
+      name: option.name,
+      slug: option.slug,
+      color_code: option.color_code || '',
+    });
+  };
+
+  const handleUpdateOption = async (typeId: number, optionId: number) => {
+    if (!optionEditData.name.trim() || !optionEditData.slug.trim()) {
+      toast.error('Option name and slug are required');
+      return;
+    }
+
+    try {
+      setIsUploading(true);
+      const payload = {
+        name: optionEditData.name,
+        slug: optionEditData.slug,
+        color_code: optionEditData.color_code || null,
+      };
+      await apiPatch(`/filter-types/${typeId}/options/${optionId}/`, payload);
+      toast.success('Filter option updated successfully');
+      setEditingOption(null);
+      setOptionEditData({ name: '', slug: '', color_code: '' });
+      loadData();
+    } catch (error) {
+      toast.error('Failed to update filter option');
     } finally {
       setIsUploading(false);
     }
@@ -304,25 +340,88 @@ const Filters = () => {
                         key={option.id}
                         className="flex items-center justify-between p-2 bg-gray-50 rounded-md"
                       >
-                        <div className="flex items-center gap-2">
-                          {option.color_code && (
-                            <div
-                              className="w-6 h-6 rounded border"
-                              style={{ backgroundColor: option.color_code }}
-                            />
+                        <div className="flex flex-col gap-2 flex-1">
+                          {editingOption?.optionId === option.id && editingOption?.typeId === type.id ? (
+                            <>
+                              <Input
+                                placeholder="Option name"
+                                value={optionEditData.name}
+                                onChange={(e) =>
+                                  setOptionEditData({
+                                    ...optionEditData,
+                                    name: e.target.value,
+                                    slug: e.target.value.toLowerCase().replace(/\s+/g, '-'),
+                                  })
+                                }
+                              />
+                              <Input
+                                placeholder="Slug"
+                                value={optionEditData.slug}
+                                onChange={(e) =>
+                                  setOptionEditData({ ...optionEditData, slug: e.target.value })
+                                }
+                              />
+                              {type.display_type === 'color_swatch' && (
+                                <Input
+                                  type="color"
+                                  value={optionEditData.color_code || '#000000'}
+                                  onChange={(e) =>
+                                    setOptionEditData({ ...optionEditData, color_code: e.target.value })
+                                  }
+                                />
+                              )}
+                            </>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              {option.color_code && (
+                                <div
+                                  className="w-6 h-6 rounded border"
+                                  style={{ backgroundColor: option.color_code }}
+                                />
+                              )}
+                              <div>
+                                <p className="font-medium">{option.name}</p>
+                                <p className="text-xs text-gray-600">{option.slug}</p>
+                              </div>
+                            </div>
                           )}
-                          <div>
-                            <p className="font-medium">{option.name}</p>
-                            <p className="text-xs text-gray-600">{option.slug}</p>
-                          </div>
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeleteOption(type.id, option.id)}
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
+                        <div className="flex items-center gap-1">
+                          {editingOption?.optionId === option.id && editingOption?.typeId === type.id ? (
+                            <>
+                              <Button
+                                size="sm"
+                                onClick={() => handleUpdateOption(type.id, option.id)}
+                                disabled={isUploading}
+                              >
+                                Save
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setEditingOption(null)}
+                                disabled={isUploading}
+                              >
+                                Cancel
+                              </Button>
+                            </>
+                          ) : (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => startEditingOption(type.id, option)}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteOption(type.id, option.id)}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
                       </div>
                     ))}
                   </div>

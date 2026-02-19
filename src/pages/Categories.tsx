@@ -4,9 +4,8 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Edit, Trash2, Plus, X, ChevronDown, ChevronRight, FolderPlus, Filter } from 'lucide-react';
 import { toast } from 'sonner';
-import { apiDelete, apiGet, apiPost, apiPut, apiUpload } from '../lib/api';
-import type { Category, Product, SubCategory, FilterType, CategoryFilter } from '../lib/types';
-import { Link } from 'react-router-dom';
+import { apiDelete, apiGet, apiPost, apiPut, apiUpload, apiPatch } from '../lib/api';
+import type { Category, Product, SubCategory, FilterType, CategoryFilter, FilterOption } from '../lib/types';
 const Categories = () => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -15,6 +14,10 @@ const Categories = () => {
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [showSubCategoryModal, setShowSubCategoryModal] = useState(false);
   const [showFilterModal, setShowFilterModal] = useState(false);
+  const [editingFilterType, setEditingFilterType] = useState<FilterType | null>(null);
+  const [editingOption, setEditingOption] = useState<FilterOption | null>(null);
+  const [optionFormData, setOptionFormData] = useState({ name: '', slug: '', color_code: '' });
+  const [optionEditData, setOptionEditData] = useState({ name: '', slug: '', color_code: '' });
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [editingSubCategory, setEditingSubCategory] = useState<SubCategory | null>(null);
   const [filterTargetCategoryId, setFilterTargetCategoryId] = useState<number | null>(null);
@@ -66,6 +69,15 @@ const Categories = () => {
   useEffect(() => {
     loadData();
   }, []);
+
+  useEffect(() => {
+    if (editingFilterType) {
+      const updated = filterTypes.find((ft) => ft.id === editingFilterType.id);
+      if (updated) {
+        setEditingFilterType(updated);
+      }
+    }
+  }, [filterTypes, editingFilterType]);
 
   const toggleCategory = (id: number) => {
     const newExpanded = new Set(expandedCategories);
@@ -367,6 +379,80 @@ const Categories = () => {
     return `Filter #${id}`;
   };
 
+  const openFilterTypeEditor = (filterTypeId: number) => {
+    const ft = filterTypes.find((f) => f.id === filterTypeId);
+    if (ft) {
+      setEditingFilterType(ft);
+      setEditingOption(null);
+      setOptionFormData({ name: '', slug: '', color_code: '' });
+      setOptionEditData({ name: '', slug: '', color_code: '' });
+    } else {
+      toast.error('Filter type not found');
+    }
+  };
+
+  const startEditingOption = (option: FilterOption) => {
+    setEditingOption(option);
+    setOptionEditData({
+      name: option.name,
+      slug: option.slug,
+      color_code: option.color_code || '',
+    });
+  };
+
+  const handleUpdateOption = async () => {
+    if (!editingFilterType || !editingOption) return;
+    if (!optionEditData.name.trim() || !optionEditData.slug.trim()) {
+      toast.error('Option name and slug are required');
+      return;
+    }
+    try {
+      await apiPatch(`/filter-types/${editingFilterType.id}/options/${editingOption.id}/`, {
+        name: optionEditData.name,
+        slug: optionEditData.slug,
+        color_code: optionEditData.color_code || null,
+      });
+      toast.success('Option updated');
+      setEditingOption(null);
+      setOptionEditData({ name: '', slug: '', color_code: '' });
+      await loadData();
+    } catch {
+      toast.error('Failed to update option');
+    }
+  };
+
+  const handleAddOption = async () => {
+    if (!editingFilterType) return;
+    if (!optionFormData.name.trim() || !optionFormData.slug.trim()) {
+      toast.error('Option name and slug are required');
+      return;
+    }
+    try {
+      await apiPost(`/filter-types/${editingFilterType.id}/options/`, {
+        name: optionFormData.name,
+        slug: optionFormData.slug,
+        color_code: optionFormData.color_code || null,
+      });
+      toast.success('Option added');
+      setOptionFormData({ name: '', slug: '', color_code: '' });
+      await loadData();
+    } catch {
+      toast.error('Failed to add option');
+    }
+  };
+
+  const handleDeleteOption = async (optionId: number) => {
+    if (!editingFilterType) return;
+    if (!confirm('Delete this option?')) return;
+    try {
+      await apiDelete(`/filter-types/${editingFilterType.id}/options/${optionId}/`);
+      toast.success('Option deleted');
+      await loadData();
+    } catch {
+      toast.error('Failed to delete option');
+    }
+  };
+
   const getSubcategoryName = (id?: number) =>
     categories
       .flatMap((c) => c.subcategories || [])
@@ -481,14 +567,17 @@ const Categories = () => {
                               • {getSubcategoryName(cf.subcategory) || 'Subcategory'}
                             </span>
                           )}
-                          <Link
-                            to="/filters"
+                          <button
+                            type="button"
                             className="text-muted-foreground hover:text-primary"
                             title="Edit filter type & options"
-                            onClick={(e) => e.stopPropagation()}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openFilterTypeEditor(cf.filter_type);
+                            }}
                           >
                             <Edit className="h-4 w-4" />
-                          </Link>
+                          </button>
                           <button
                             type="button"
                             onClick={() => handleDeleteCategoryFilter(cf.id)}
@@ -848,6 +937,144 @@ const Categories = () => {
                 <Button variant="outline" onClick={() => setShowSubCategoryModal(false)}>Cancel</Button>
                 <Button onClick={handleSaveSubCategory}>
                   {editingSubCategory ? 'Update Subcategory' : 'Create Subcategory'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {editingFilterType && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>Edit Filter: {editingFilterType.name}</CardTitle>
+                <Button variant="ghost" size="icon" onClick={() => setEditingFilterType(null)}>
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <h4 className="font-semibold text-sm">Options</h4>
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {editingFilterType.options.map((opt) => (
+                    <div
+                      key={opt.id}
+                      className="flex items-start justify-between p-2 bg-gray-50 rounded-md border"
+                    >
+                      <div className="flex-1 space-y-2">
+                        {editingOption?.id === opt.id ? (
+                          <>
+                            <Input
+                              placeholder="Option name"
+                              value={optionEditData.name}
+                              onChange={(e) =>
+                                setOptionEditData({
+                                  ...optionEditData,
+                                  name: e.target.value,
+                                  slug: e.target.value.toLowerCase().replace(/\s+/g, '-'),
+                                })
+                              }
+                            />
+                            <Input
+                              placeholder="Slug"
+                              value={optionEditData.slug}
+                              onChange={(e) =>
+                                setOptionEditData({ ...optionEditData, slug: e.target.value })
+                              }
+                            />
+                            {editingFilterType.display_type === 'color_swatch' && (
+                              <Input
+                                type="color"
+                                value={optionEditData.color_code || '#000000'}
+                                onChange={(e) =>
+                                  setOptionEditData({ ...optionEditData, color_code: e.target.value })
+                                }
+                              />
+                            )}
+                          </>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            {opt.color_code && (
+                              <div
+                                className="w-6 h-6 rounded border"
+                                style={{ backgroundColor: opt.color_code }}
+                              />
+                            )}
+                            <div>
+                              <p className="font-medium">{opt.name}</p>
+                              <p className="text-xs text-muted-foreground">{opt.slug}</p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {editingOption?.id === opt.id ? (
+                          <>
+                            <Button size="sm" onClick={handleUpdateOption}>Save</Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setEditingOption(null);
+                                setOptionEditData({ name: '', slug: '', color_code: '' });
+                              }}
+                            >
+                              Cancel
+                            </Button>
+                          </>
+                        ) : (
+                          <Button variant="ghost" size="sm" onClick={() => startEditingOption(opt)}>
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteOption(opt.id)}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                  {editingFilterType.options.length === 0 && (
+                    <p className="text-sm text-muted-foreground">No options yet.</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="pt-2 border-t space-y-3">
+                <h4 className="font-semibold text-sm">Add New Option</h4>
+                <Input
+                  placeholder="Option name"
+                  value={optionFormData.name}
+                  onChange={(e) =>
+                    setOptionFormData({
+                      ...optionFormData,
+                      name: e.target.value,
+                      slug: e.target.value.toLowerCase().replace(/\s+/g, '-'),
+                    })
+                  }
+                />
+                <Input
+                  placeholder="Slug"
+                  value={optionFormData.slug}
+                  onChange={(e) => setOptionFormData({ ...optionFormData, slug: e.target.value })}
+                />
+                {editingFilterType.display_type === 'color_swatch' && (
+                  <Input
+                    type="color"
+                    value={optionFormData.color_code || '#000000'}
+                    onChange={(e) =>
+                      setOptionFormData({ ...optionFormData, color_code: e.target.value })
+                    }
+                  />
+                )}
+                <Button onClick={handleAddOption}>
+                  <Plus className="h-4 w-4 mr-2" /> Add Option
                 </Button>
               </div>
             </CardContent>
