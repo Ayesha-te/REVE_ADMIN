@@ -25,12 +25,12 @@ const DEFAULT_DIMENSION_ROWS = [
   {
     measurement: 'Length',
     values: {
-      '2ft6 Small Single': '193 cm (76.0")',
-      '3ft Single': '193 cm (76.0")',
-      '4ft Small Double': '193 cm (76.0")',
-      '4ft6 Double': '193 cm (76.0")',
-      '5ft King': '203 cm (79.9")',
-      '6ft Super King': '203 cm (79.9")',
+      '2ft6 Small Single': '190 cm (74.8")',
+      '3ft Single': '190 cm (74.8")',
+      '4ft Small Double': '190 cm (74.8")',
+      '4ft6 Double': '190 cm (74.8")',
+      '5ft King': '200 cm (78.7")',
+      '6ft Super King': '200 cm (78.7")',
     },
   },
   {
