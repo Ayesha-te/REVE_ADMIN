@@ -23,6 +23,9 @@ const emptyForm: CollectionForm = {
   products: [],
 };
 
+
+
+
 const Collections = () => {
   const [collections, setCollections] = useState<Collection[]>([]);
   const [products, setProducts] = useState<Product[]>([]);

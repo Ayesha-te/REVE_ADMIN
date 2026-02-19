@@ -27,7 +27,7 @@ const Filters = () => {
   const [optionFormData, setOptionFormData] = useState({
     name: '',
     slug: '',
-    color_code: '',
+    color_code:     '',
   });
 
   const [categoryFilterForm, setCategoryFilterForm] = useState({

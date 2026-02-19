@@ -7,7 +7,6 @@ import { toast } from 'sonner';
 import { apiDelete, apiGet, apiPost, apiPut, apiUpload } from '../lib/api';
 import type { Category, Product, SubCategory, FilterType, CategoryFilter } from '../lib/types';
 import { Link } from 'react-router-dom';
-
 const Categories = () => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
