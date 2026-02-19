@@ -1,27 +1,33 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Edit, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { apiDelete, apiGet } from '../lib/api';
-import type { Product } from '../lib/types';
+import type { Product, Category } from '../lib/types';
 import { toast } from 'sonner';
 
 const Products = () => {
   const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | 'all'>('all');
 
-  const loadProducts = async () => {
+  const loadData = async () => {
     try {
-      const data = await apiGet<Product[]>('/products/');
-      setProducts(data);
+      const [productsData, categoriesData] = await Promise.all([
+        apiGet<Product[]>('/products/'),
+        apiGet<Category[]>('/categories/'),
+      ]);
+      setProducts(productsData);
+      setCategories(categoriesData);
     } catch {
       toast.error('Failed to load products');
     }
   };
 
   useEffect(() => {
-    loadProducts();
+    loadData();
   }, []);
 
   const handleDelete = async (id: number) => {
@@ -29,11 +35,16 @@ const Products = () => {
     try {
       await apiDelete(`/products/${id}/`);
       toast.success('Product deleted');
-      await loadProducts();
+      await loadData();
     } catch {
       toast.error('Delete failed');
     }
   };
+
+  const filteredProducts = useMemo(() => {
+    if (selectedCategoryId === 'all') return products;
+    return products.filter((product) => Number(product.category) === Number(selectedCategoryId));
+  }, [products, selectedCategoryId]);
 
   return (
     <div className="space-y-6">
@@ -49,6 +60,30 @@ const Products = () => {
         </Link>
       </div>
 
+      <div className="flex flex-wrap items-center gap-3">
+        <label className="text-sm font-medium text-muted-foreground">Filter by category</label>
+        <select
+          className="min-w-[220px] rounded-md border border-input bg-white px-3 py-2 text-sm"
+          value={selectedCategoryId === 'all' ? '' : selectedCategoryId}
+          onChange={(e) => {
+            const val = e.target.value;
+            setSelectedCategoryId(val === '' ? 'all' : Number(val));
+          }}
+        >
+          <option value="">All categories</option>
+          {categories.map((cat) => (
+            <option key={cat.id} value={cat.id}>
+              {cat.name}
+            </option>
+          ))}
+        </select>
+        {selectedCategoryId !== 'all' && (
+          <Button variant="outline" size="sm" onClick={() => setSelectedCategoryId('all')}>
+            Clear
+          </Button>
+        )}
+      </div>
+
       <Card>
         <CardContent className="p-0">
           <Table>
@@ -62,15 +97,17 @@ const Products = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {products.map((product) => (
+              {filteredProducts.map((product) => (
                 <TableRow key={product.id}>
                   <TableCell className="font-medium">{product.name}</TableCell>
                   <TableCell>{product.category_name || product.category}</TableCell>
                   <TableCell>£{product.price}</TableCell>
                   <TableCell>
-                    <span className={`px-2 py-1 rounded-full text-xs ${
-                      product.in_stock ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                    }`}>
+                    <span
+                      className={`px-2 py-1 rounded-full text-xs ${
+                        product.in_stock ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                      }`}
+                    >
                       {product.in_stock ? 'In Stock' : 'Out of Stock'}
                     </span>
                   </TableCell>
@@ -80,7 +117,12 @@ const Products = () => {
                         <Edit className="h-4 w-4" />
                       </Button>
                     </Link>
-                    <Button variant="ghost" size="icon" className="text-destructive" onClick={() => handleDelete(product.id)}>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="text-destructive"
+                      onClick={() => handleDelete(product.id)}
+                    >
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </TableCell>
