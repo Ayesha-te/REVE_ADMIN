@@ -16,11 +16,18 @@ const Products = () => {
   const loadData = async () => {
     try {
       const [productsData, categoriesData] = await Promise.all([
-        apiGet<Product[]>('/products/'),
-        apiGet<Category[]>('/categories/'),
+        apiGet<Product[] | { results?: Product[] }>('/products/'),
+        apiGet<Category[] | { results?: Category[] }>('/categories/'),
       ]);
-      setProducts(productsData);
-      setCategories(categoriesData);
+
+      const normalizeList = <T,>(data: T[] | { results?: T[] }): T[] => {
+        if (Array.isArray(data)) return data;
+        if (Array.isArray((data as { results?: T[] }).results)) return (data as { results: T[] }).results;
+        return [];
+      };
+
+      setProducts(normalizeList(productsData));
+      setCategories(normalizeList(categoriesData));
     } catch {
       toast.error('Failed to load products');
     }
