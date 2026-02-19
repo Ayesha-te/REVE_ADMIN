@@ -407,10 +407,11 @@ const Categories = () => {
       return;
     }
     try {
-      await apiPatch(`/filter-types/${editingFilterType.id}/options/${editingOption.id}/`, {
+      await apiPatch(`/filter-options/${editingOption.id}/`, {
         name: optionEditData.name,
         slug: optionEditData.slug,
         color_code: optionEditData.color_code || null,
+        filter_type: editingFilterType.id,
       });
       toast.success('Option updated');
       setEditingOption(null);
@@ -428,10 +429,11 @@ const Categories = () => {
       return;
     }
     try {
-      await apiPost(`/filter-types/${editingFilterType.id}/options/`, {
+      await apiPost('/filter-options/', {
         name: optionFormData.name,
         slug: optionFormData.slug,
         color_code: optionFormData.color_code || null,
+        filter_type: editingFilterType.id,
       });
       toast.success('Option added');
       setOptionFormData({ name: '', slug: '', color_code: '' });
@@ -445,7 +447,7 @@ const Categories = () => {
     if (!editingFilterType) return;
     if (!confirm('Delete this option?')) return;
     try {
-      await apiDelete(`/filter-types/${editingFilterType.id}/options/${optionId}/`);
+      await apiDelete(`/filter-options/${optionId}/`);
       toast.success('Option deleted');
       await loadData();
     } catch {

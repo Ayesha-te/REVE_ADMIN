@@ -151,8 +151,9 @@ const Filters = () => {
         name: optionFormData.name,
         slug: optionFormData.slug,
         color_code: optionFormData.color_code || null,
+        filter_type: typeId,
       };
-      await apiPost(`/filter-types/${typeId}/options/`, payload);
+      await apiPost('/filter-options/', payload);
       toast.success('Filter option added successfully');
       setOptionFormData({ name: '', slug: '', color_code: '' });
       loadData();
@@ -184,8 +185,9 @@ const Filters = () => {
         name: optionEditData.name,
         slug: optionEditData.slug,
         color_code: optionEditData.color_code || null,
+        filter_type: typeId,
       };
-      await apiPatch(`/filter-types/${typeId}/options/${optionId}/`, payload);
+      await apiPatch(`/filter-options/${optionId}/`, payload);
       toast.success('Filter option updated successfully');
       setEditingOption(null);
       setOptionEditData({ name: '', slug: '', color_code: '' });
@@ -197,10 +199,10 @@ const Filters = () => {
     }
   };
 
-  const handleDeleteOption = async (typeId: number, optionId: number) => {
+  const handleDeleteOption = async (_typeId: number, optionId: number) => {
     if (!confirm('Are you sure you want to delete this filter option?')) return;
     try {
-      await apiDelete(`/filter-types/${typeId}/options/${optionId}/`);
+      await apiDelete(`/filter-options/${optionId}/`);
       toast.success('Filter option deleted successfully');
       loadData();
     } catch {
