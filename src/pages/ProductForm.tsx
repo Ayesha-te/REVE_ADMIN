@@ -1070,8 +1070,11 @@ const ProductForm = () => {
             const measurement = (row.measurement || '').trim();
             const values = Object.fromEntries(
               Object.entries(row.values || {})
-                .map(([key, value]) => [key, String(value || '').trim()])
-                .filter(([, value]) => value.length > 0)
+                .map(([key, value]) => {
+                  const str = String(value ?? '').trim();
+                  return [key, str];
+                })
+                .filter(([, str]) => str.length > 0)
             );
             return { measurement, values };
           })
