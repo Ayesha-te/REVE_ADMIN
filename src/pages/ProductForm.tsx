@@ -172,6 +172,7 @@ const createProductSchema = (requireImages: boolean) =>
       )
       .optional(),
     dimension_paragraph: z.string().optional(),
+    show_dimensions_table: z.boolean().optional(),
     faqs: z
       .array(
         z.object({
@@ -319,6 +320,7 @@ const ProductForm = () => {
       features: [],
       dimensions: [],
       dimension_paragraph: '',
+      show_dimensions_table: true,
       faqs: [],
       delivery_info: '',
       returns_guarantee: '',
@@ -623,6 +625,7 @@ const ProductForm = () => {
           values: row.values || {},
         }));
         setValue('dimension_paragraph', product.dimension_paragraph || '');
+        setValue('show_dimensions_table', product.show_dimensions_table !== false);
         setDimensionColumns(deriveDimensionColumnsFromRows(dimensions));
         setValue('images', images);
         setValue('videos', videos);
@@ -1125,6 +1128,7 @@ const ProductForm = () => {
               Object.values(row.values).some((value) => (value as string).length > 0)
           ),
         dimension_paragraph: (data.dimension_paragraph || '').trim(),
+        show_dimensions_table: data.show_dimensions_table !== false,
         faqs: (data.faqs || [])
           .map((faq) => ({
             question: (faq.question || '').trim(),
@@ -1178,6 +1182,9 @@ const ProductForm = () => {
       }
       if (!payload.dimensions || payload.dimensions.length === 0) {
         delete (payload as Partial<ProductFormValues>).dimensions;
+      }
+      if (payload.show_dimensions_table === true) {
+        delete (payload as Partial<ProductFormValues>).show_dimensions_table;
       }
       if (!payload.dimension_paragraph) {
         delete (payload as Partial<ProductFormValues>).dimension_paragraph;
@@ -2171,6 +2178,14 @@ const ProductForm = () => {
               <div className="flex items-center justify-between">
                 <label className="text-sm font-medium">Dimensions Table</label>
                 <div className="flex gap-2">
+                  <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <input
+                      type="checkbox"
+                      checked={watch('show_dimensions_table') !== false}
+                      onChange={(e) => setValue('show_dimensions_table', e.target.checked)}
+                    />
+                    Show table
+                  </label>
                   <Button
                     type="button"
                     variant="outline"

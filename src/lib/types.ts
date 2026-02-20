@@ -115,6 +115,7 @@ export interface Product {
   short_description?: string;
   features: string[];
   dimensions?: ProductDimensionRow[];
+  show_dimensions_table?: boolean;
   faqs?: ProductFaq[];
   delivery_info?: string;
   returns_guarantee?: string;
