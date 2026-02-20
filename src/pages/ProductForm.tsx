@@ -158,6 +158,9 @@ const createProductSchema = (requireImages: boolean) =>
           image_url: z.string().optional(),
           price: z.number().nullable().optional(),
           enable_bunk_positions: z.boolean().optional(),
+          price_top: z.number().nullable().optional(),
+          price_bottom: z.number().nullable().optional(),
+          price_both: z.number().nullable().optional(),
           source_product: z.number().nullable().optional(),
         })
       )
@@ -614,6 +617,9 @@ const ProductForm = () => {
           image_url: m.image_url || '',
           price: m.price !== undefined && m.price !== null ? Number(m.price) : null,
           enable_bunk_positions: m.enable_bunk_positions ?? false,
+          price_top: m.price_top !== undefined && m.price_top !== null ? Number(m.price_top) : null,
+          price_bottom: m.price_bottom !== undefined && m.price_bottom !== null ? Number(m.price_bottom) : null,
+          price_both: m.price_both !== undefined && m.price_both !== null ? Number(m.price_both) : null,
           source_product: m.source_product || null,
         }));
         const faqs = (product.faqs || []).map((faq) => ({
@@ -1099,6 +1105,24 @@ const ProductForm = () => {
             description: (m.description || '').trim(),
             image_url: (m.image_url || '').trim(),
             enable_bunk_positions: Boolean(m.enable_bunk_positions),
+            price_top: (() => {
+              const raw = (m as { price_top?: unknown })?.price_top;
+              if (raw === null || raw === undefined || raw === '') return null;
+              const num = Number(raw as any);
+              return Number.isFinite(num) ? num : null;
+            })(),
+            price_bottom: (() => {
+              const raw = (m as { price_bottom?: unknown })?.price_bottom;
+              if (raw === null || raw === undefined || raw === '') return null;
+              const num = Number(raw as any);
+              return Number.isFinite(num) ? num : null;
+            })(),
+            price_both: (() => {
+              const raw = (m as { price_both?: unknown })?.price_both;
+              if (raw === null || raw === undefined || raw === '') return null;
+              const num = Number(raw as any);
+              return Number.isFinite(num) ? num : null;
+            })(),
             price: (() => {
               const raw = (m as { price?: unknown })?.price;
               if (raw === null || raw === undefined || raw === '') return null;
@@ -1883,7 +1907,19 @@ const ProductForm = () => {
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() => appendMattress({ name: '', description: '', image_url: '', price: null, source_product: null, enable_bunk_positions: false })}
+                    onClick={() =>
+                      appendMattress({
+                        name: '',
+                        description: '',
+                        image_url: '',
+                        price: null,
+                        source_product: null,
+                        enable_bunk_positions: false,
+                        price_top: null,
+                        price_bottom: null,
+                        price_both: null,
+                      })
+                    }
                   >
                     <Plus className="h-4 w-4 mr-2" /> Add Mattress
                   </Button>
@@ -1945,6 +1981,34 @@ const ProductForm = () => {
                         />
                         Allow bunk selection (Top / Bottom / Both) for this mattress; “Both” charges 2× price.
                       </label>
+                      {watch(`mattresses.${index}.enable_bunk_positions`) && (
+                        <div className="col-span-2 grid grid-cols-3 gap-2">
+                          <Input
+                            type="number"
+                            step="0.01"
+                            {...register(`mattresses.${index}.price_top` as const, {
+                              setValueAs: (val) => (val === '' || val === null || val === undefined ? null : Number(val)),
+                            })}
+                            placeholder="Top price (£)"
+                          />
+                          <Input
+                            type="number"
+                            step="0.01"
+                            {...register(`mattresses.${index}.price_bottom` as const, {
+                              setValueAs: (val) => (val === '' || val === null || val === undefined ? null : Number(val)),
+                            })}
+                            placeholder="Bottom price (£)"
+                          />
+                          <Input
+                            type="number"
+                            step="0.01"
+                            {...register(`mattresses.${index}.price_both` as const, {
+                              setValueAs: (val) => (val === '' || val === null || val === undefined ? null : Number(val)),
+                            })}
+                            placeholder="Both price (£)"
+                          />
+                        </div>
+                      )}
                     </div>
                     {watch(`mattresses.${index}.image_url`) && (
                       <img
