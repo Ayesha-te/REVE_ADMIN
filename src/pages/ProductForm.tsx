@@ -383,7 +383,7 @@ const ProductForm = () => {
 
   const clearDimensionValuesForSizes = (sizes: string[]) => {
     const currentDimensions = watch('dimensions') || [];
-    currentDimensions.forEach((row, idx) => {
+    currentDimensions.forEach((_, idx) => {
       sizes.forEach((size) => setValue(`dimensions.${idx}.values.${size}`, ''));
     });
   };
@@ -1109,7 +1109,7 @@ const ProductForm = () => {
               Object.entries(row.values || {})
                 .filter(([key]) => activeDimensionSizes.includes(key))
                 .map(([key, value]) => [key, String(value || '').trim()])
-                .filter(([, value]) => value.length > 0)
+                .filter(([, value]) => (value as string).length > 0)
             );
             return { measurement, values };
           })
@@ -2116,7 +2116,7 @@ const ProductForm = () => {
                         DEFAULT_DIMENSION_ROWS.map((row) => ({
                           measurement: row.measurement,
                           values: Object.fromEntries(
-                            sizes.map((size) => [size, row.values[size] || ''])
+                            sizes.map((size) => [size, (row.values as Record<string, string>)[size] || ''])
                           ),
                         }))
                       );
