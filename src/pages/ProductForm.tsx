@@ -287,7 +287,6 @@ const ProductForm = () => {
   const [mattressImportId, setMattressImportId] = useState('');
   const [importProductOptions, setImportProductOptions] = useState<Product[]>([]);
   const [selectedImportProductId, setSelectedImportProductId] = useState<number | null>(null);
-  const [filterTypes, setFilterTypes] = useState<FilterType[]>([]);
   const [filterOptions, setFilterOptions] = useState<FilterOption[]>([]);
   const [categoryFilterOptions, setCategoryFilterOptions] = useState<FilterOption[]>([]);
   const [dimensionColumns, setDimensionColumns] = useState<string[]>(() => [...DIMENSION_SIZE_COLUMNS]);
@@ -462,7 +461,7 @@ const ProductForm = () => {
   useEffect(() => {
     const load = async () => {
       try {
-        const [cats, subs, products, filters, options] = await Promise.all([
+        const [cats, subs, products, _filters, options] = await Promise.all([
           apiGet<Category[]>('/categories/'),
           apiGet<SubCategory[]>('/subcategories/'),
           apiGet<Product[]>('/products/'),
@@ -472,7 +471,6 @@ const ProductForm = () => {
         setCategories(cats);
         setSubcategories(subs);
         setImportProductOptions(Array.isArray(products) ? products : []);
-        setFilterTypes(filters || []);
         setFilterOptions((options || []).filter((opt) => opt.is_active !== false));
       } catch {
         toast.error('Failed to load categories');
@@ -499,7 +497,6 @@ const ProductForm = () => {
 
         const activeTypes = (typesRes || []).filter((ft) => ft.is_active !== false);
         const activeTypeIds = new Set(activeTypes.map((ft) => ft.id));
-        setFilterTypes(activeTypes);
 
         setFilterOptions(
           (optsRes || []).filter(
