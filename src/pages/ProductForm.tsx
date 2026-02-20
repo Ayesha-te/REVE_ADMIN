@@ -289,6 +289,7 @@ const ProductForm = () => {
   const [filterTypes, setFilterTypes] = useState<FilterType[]>([]);
   const [filterOptions, setFilterOptions] = useState<FilterOption[]>([]);
   const [categoryFilterOptions, setCategoryFilterOptions] = useState<FilterOption[]>([]);
+  const [dimensionColumns, setDimensionColumns] = useState<string[]>(() => [...DIMENSION_SIZE_COLUMNS]);
 
   const { register, control, handleSubmit, formState: { errors }, setValue, watch } = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
@@ -341,6 +342,12 @@ const ProductForm = () => {
     watchPrice && watchDiscount && watchDiscount > 0 && displayDiscountFactor && displayDiscountFactor > 0
       ? (watchPrice / displayDiscountFactor).toFixed(2)
       : '';
+
+  const deriveDimensionColumnsFromRows = (rows: ProductDimensionRow[]) => {
+    const columnSet = new Set<string>(DIMENSION_SIZE_COLUMNS);
+    rows.forEach((row) => Object.keys(row.values || {}).forEach((key) => columnSet.add(key)));
+    return Array.from(columnSet);
+  };
 
   const adjustWidthForWingback = (rows: ProductDimensionRow[]): ProductDimensionRow[] => {
     if (!hasWingbackHeadboard) return rows;
@@ -606,6 +613,7 @@ const ProductForm = () => {
           measurement: (row.measurement || '').trim(),
           values: row.values || {},
         }));
+        setDimensionColumns(deriveDimensionColumnsFromRows(dimensions));
         setValue('images', images);
         setValue('videos', videos);
         setValue('colors', colors);
@@ -676,6 +684,22 @@ const ProductForm = () => {
     } finally {
       setIsUploading(false);
     }
+  };
+
+  const handleRemoveDimensionColumn = (column: string) => {
+    if (dimensionColumns.length <= 1) {
+      toast.error('At least one size column is required.');
+      return;
+    }
+    if (!confirm(`Remove the "${column}" column from the dimensions table?`)) return;
+    const currentRows = (watch('dimensions') || []).map((row) => {
+      const nextValues = { ...(row.values || {}) };
+      delete nextValues[column];
+      return { ...row, values: nextValues };
+    });
+    setDimensionColumns((cols) => cols.filter((c) => c !== column));
+    setValue('dimensions', currentRows);
+    replaceDimensions(currentRows);
   };
 
   const importStylesFromProduct = async () => {
@@ -2105,16 +2129,17 @@ const ProductForm = () => {
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() =>
-                      replaceDimensions(
-                        adjustWidthForWingback(
-                          DEFAULT_DIMENSION_ROWS.map((row) => ({
-                            measurement: row.measurement,
-                            values: { ...row.values },
-                          }))
-                        )
-                      )
-                    }
+                    onClick={() => {
+                      const defaultRows = adjustWidthForWingback(
+                        DEFAULT_DIMENSION_ROWS.map((row) => ({
+                          measurement: row.measurement,
+                          values: { ...row.values },
+                        }))
+                      );
+                      setDimensionColumns([...DIMENSION_SIZE_COLUMNS]);
+                      replaceDimensions(defaultRows);
+                      setValue('dimensions', defaultRows);
+                    }}
                   >
                     Apply Default Dimensions
                   </Button>
@@ -2125,7 +2150,7 @@ const ProductForm = () => {
                     onClick={() =>
                       appendDimension({
                         measurement: '',
-                        values: Object.fromEntries(DIMENSION_SIZE_COLUMNS.map((size) => [size, ''])),
+                        values: Object.fromEntries(dimensionColumns.map((size) => [size, ''])),
                       })
                     }
                   >
@@ -2143,8 +2168,22 @@ const ProductForm = () => {
                   <thead className="bg-muted/60">
                     <tr>
                       <th className="p-2 text-left font-medium whitespace-nowrap">Measurement</th>
-                      {DIMENSION_SIZE_COLUMNS.map((size) => (
-                        <th key={size} className="p-2 text-left font-medium whitespace-nowrap">{size}</th>
+                      {dimensionColumns.map((size) => (
+                        <th key={size} className="p-2 text-left font-medium whitespace-nowrap">
+                          <div className="flex items-center gap-2">
+                            <span>{size}</span>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-destructive hover:text-destructive/80"
+                              onClick={() => handleRemoveDimensionColumn(size)}
+                              title={`Remove ${size} column`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </th>
                       ))}
                       <th className="p-2 text-left font-medium whitespace-nowrap">Action</th>
                     </tr>
@@ -2160,7 +2199,7 @@ const ProductForm = () => {
                             className="whitespace-nowrap"
                           />
                         </td>
-                        {DIMENSION_SIZE_COLUMNS.map((size) => (
+                        {dimensionColumns.map((size) => (
                           <td key={`${field.id}-${size}`} className="p-2 align-top whitespace-nowrap min-w-[175px]">
                             <Controller
                               control={control}
@@ -2190,7 +2229,7 @@ const ProductForm = () => {
                     ))}
                     {dimensionFields.length === 0 && (
                       <tr>
-                        <td colSpan={DIMENSION_SIZE_COLUMNS.length + 2} className="p-4 text-center text-muted-foreground">
+                        <td colSpan={dimensionColumns.length + 2} className="p-4 text-center text-muted-foreground">
                           No dimensions added yet. Click "Apply Default Dimensions" or add rows manually.
                         </td>
                       </tr>
