@@ -1072,7 +1072,7 @@ const ProductForm = () => {
             const values = Object.fromEntries(
               Object.entries(row.values || {})
                 .map(([key, value]) => {
-                  const str = String(value ?? '').trim();
+                  const str = String(value as unknown as string | number | boolean | null | undefined ?? '').trim();
                   return [key, str];
                 })
                 .filter(([, str]) => str.length > 0)
