@@ -29,6 +29,7 @@ export interface Collection {
 export interface ProductImage {
   id?: number;
   url: string;
+  color_name?: string;
 }
 
 export interface ProductVideo {
@@ -121,6 +122,7 @@ export interface Product {
   returns_title?: string;
   custom_info_sections?: { title?: string; content?: string }[];
   delivery_charges?: number;
+  dimension_paragraph?: string;
   in_stock: boolean;
   is_bestseller: boolean;
   is_new: boolean;

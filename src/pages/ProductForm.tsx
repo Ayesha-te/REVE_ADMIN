@@ -90,7 +90,14 @@ const createProductSchema = (requireImages: boolean) =>
     is_bestseller: z.boolean().optional(),
     is_new: z.boolean().optional(),
     show_size_icons: z.boolean().optional(),
-    images: z.array(z.object({ url: z.string().optional().nullable() })).optional(),
+    images: z
+      .array(
+        z.object({
+          url: z.string().optional().nullable(),
+          color_name: z.string().optional().nullable(),
+        })
+      )
+      .optional(),
     videos: z.array(z.object({ url: z.string().optional().nullable() })).optional(),
     colors: z.array(z.object({ name: z.string().optional(), hex_code: z.string().optional(), image_url: z.string().optional() })).optional(),
     sizes: z
@@ -164,6 +171,7 @@ const createProductSchema = (requireImages: boolean) =>
         })
       )
       .optional(),
+    dimension_paragraph: z.string().optional(),
     faqs: z
       .array(
         z.object({
@@ -310,6 +318,7 @@ const ProductForm = () => {
       delivery_charges: 0,
       features: [],
       dimensions: [],
+      dimension_paragraph: '',
       faqs: [],
       delivery_info: '',
       returns_guarantee: '',
@@ -566,7 +575,7 @@ const ProductForm = () => {
         setValue('is_bestseller', product.is_bestseller);
         setValue('is_new', product.is_new);
         setValue('show_size_icons', product.show_size_icons !== false);
-        const images = product.images.map((i) => ({ url: i.url }));
+        const images = product.images.map((i) => ({ url: i.url, color_name: i.color_name || '' }));
         const videos = product.videos.map((v) => ({ url: v.url }));
         const colors = product.colors.map((c) => ({
           name: c.name,
@@ -613,6 +622,7 @@ const ProductForm = () => {
           measurement: (row.measurement || '').trim(),
           values: row.values || {},
         }));
+        setValue('dimension_paragraph', product.dimension_paragraph || '');
         setDimensionColumns(deriveDimensionColumnsFromRows(dimensions));
         setValue('images', images);
         setValue('videos', videos);
@@ -1016,7 +1026,12 @@ const ProductForm = () => {
         description: data.description.trim(),
         discount_percentage: Number.isFinite(discountPercentage) ? discountPercentage : 0,
         original_price: Number.isFinite(computedOriginalPrice) ? computedOriginalPrice : null,
-        images: (data.images || []).filter((img) => (img.url || '').trim().length > 0),
+        images: (data.images || [])
+          .map((img) => ({
+            url: (img.url || '').trim(),
+            color_name: (img.color_name || '').trim(),
+          }))
+          .filter((img) => img.url.length > 0),
         videos: (data.videos || []).filter((vid) => (vid.url || '').trim().length > 0),
         colors: (data.colors || [])
           .map((col) => ({
@@ -1109,6 +1124,7 @@ const ProductForm = () => {
               row.measurement.length > 0 &&
               Object.values(row.values).some((value) => (value as string).length > 0)
           ),
+        dimension_paragraph: (data.dimension_paragraph || '').trim(),
         faqs: (data.faqs || [])
           .map((faq) => ({
             question: (faq.question || '').trim(),
@@ -1162,6 +1178,9 @@ const ProductForm = () => {
       }
       if (!payload.dimensions || payload.dimensions.length === 0) {
         delete (payload as Partial<ProductFormValues>).dimensions;
+      }
+      if (!payload.dimension_paragraph) {
+        delete (payload as Partial<ProductFormValues>).dimension_paragraph;
       }
       if (!payload.faqs || payload.faqs.length === 0) {
         delete (payload as Partial<ProductFormValues>).faqs;
@@ -1373,7 +1392,9 @@ const ProductForm = () => {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">Product Images *</label>
-              {imageFields.map((field, index) => (
+              {imageFields.map((field, index) => {
+                const colorOptions = (watch('colors') || []).map((c) => c.name).filter(Boolean);
+                return (
                 <div key={field.id} className="space-y-2">
                   <div className="flex gap-2">
                     <Input 
@@ -1396,8 +1417,24 @@ const ProductForm = () => {
                   {watch(`images.${index}.url`) && (
                     <img src={watch(`images.${index}.url`) || undefined} alt={`Preview ${index + 1}`} className="w-32 h-32 object-cover rounded-md border" />
                   )}
+                  <div className="grid gap-1">
+                    <label className="text-xs text-muted-foreground">Optional: bind to color</label>
+                    <select
+                      className="w-56 rounded-md border border-input bg-white px-2 py-1 text-sm"
+                      value={watch(`images.${index}.color_name`) || ''}
+                      onChange={(e) => setValue(`images.${index}.color_name`, e.target.value)}
+                    >
+                      <option value="">No color binding</option>
+                      {colorOptions.map((name) => (
+                        <option key={name} value={name}>
+                          {name}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-[11px] text-muted-foreground">If set, this image shows when that color is selected on the storefront.</p>
+                  </div>
                 </div>
-              ))}
+              )})}
               {errors.images && <p className="text-xs text-destructive">{errors.images.message}</p>}
               {isUploading && <p className="text-xs text-muted-foreground">Uploading...</p>}
             </div>
@@ -2251,6 +2288,20 @@ const ProductForm = () => {
                   <option key={measurement} value={measurement} />
                 ))}
               </datalist>
+            </div>
+
+            <div className="grid gap-2">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium">Dimensions Paragraph (optional)</label>
+                <p className="text-xs text-muted-foreground">Use when you prefer a short note instead of a table.</p>
+              </div>
+              <textarea
+                {...register('dimension_paragraph')}
+                rows={4}
+                placeholder="e.g. Overall dimensions: 200cm L x 150cm W x 120cm H. Suits standard UK single mattresses."
+                className="flex min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              />
+              <p className="text-xs text-muted-foreground">If filled, the storefront will show this text. Leave empty to show the table above.</p>
             </div>
 
             <div className="grid gap-2">
