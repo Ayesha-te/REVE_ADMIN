@@ -289,7 +289,6 @@ const ProductForm = () => {
   const [filterTypes, setFilterTypes] = useState<FilterType[]>([]);
   const [filterOptions, setFilterOptions] = useState<FilterOption[]>([]);
   const [categoryFilterOptions, setCategoryFilterOptions] = useState<FilterOption[]>([]);
-  const [activeDimensionSizes, setActiveDimensionSizes] = useState<string[]>(DIMENSION_SIZE_COLUMNS);
 
   const { register, control, handleSubmit, formState: { errors }, setValue, watch } = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
@@ -366,53 +365,18 @@ const ProductForm = () => {
     });
   };
 
-  const setActiveSizesFromDimensions = (dimensions: ProductDimensionRow[]) => {
-    const used = new Set<string>();
-    dimensions.forEach((row) => {
-      Object.entries(row.values || {}).forEach(([size, value]) => {
-        if (String(value || '').trim()) used.add(size);
-      });
-    });
-    if (used.size === 0) {
-      setActiveDimensionSizes(DIMENSION_SIZE_COLUMNS);
-      return;
+  const handleUploadColorImage = async (file: File, index: number) => {
+    if (!file) return;
+    setIsUploading(true);
+    try {
+      const res = await apiUpload('/uploads/', file);
+      setValue(`colors.${index}.image_url`, res.url);
+      toast.success('Color image uploaded');
+    } catch {
+      toast.error('Upload failed');
+    } finally {
+      setIsUploading(false);
     }
-    const ordered = DIMENSION_SIZE_COLUMNS.filter((size) => used.has(size));
-    setActiveDimensionSizes(ordered.length > 0 ? ordered : Array.from(used));
-  };
-
-  const clearDimensionValuesForSizes = (sizes: string[]) => {
-    const currentDimensions = watch('dimensions') || [];
-    currentDimensions.forEach((_, idx) => {
-      sizes.forEach((size) => setValue(`dimensions.${idx}.values.${size}`, ''));
-    });
-  };
-
-  const ensureSizeKeysExist = (sizes: string[]) => {
-    const currentDimensions = watch('dimensions') || [];
-    currentDimensions.forEach((row, idx) => {
-      sizes.forEach((size) => {
-        if (!Object.prototype.hasOwnProperty.call(row.values || {}, size)) {
-          setValue(`dimensions.${idx}.values.${size}`, '');
-        }
-      });
-    });
-  };
-
-  const removeSizeColumn = (size: string) => {
-    setActiveDimensionSizes((prev) => prev.filter((s) => s !== size));
-    clearDimensionValuesForSizes([size]);
-  };
-
-  const removeFirstTwoSizeColumns = () => {
-    const toRemove = DIMENSION_SIZE_COLUMNS.slice(0, 2);
-    setActiveDimensionSizes((prev) => prev.filter((s) => !toRemove.includes(s)));
-    clearDimensionValuesForSizes(toRemove);
-  };
-
-  const restoreAllSizeColumns = () => {
-    setActiveDimensionSizes(DIMENSION_SIZE_COLUMNS);
-    ensureSizeKeysExist(DIMENSION_SIZE_COLUMNS);
   };
 
   const { fields: imageFields, append: appendImage, remove: removeImage, replace: replaceImages } = useFieldArray({
@@ -681,7 +645,6 @@ const ProductForm = () => {
         setValue('features', product.features || []);
         setValue('delivery_info', product.delivery_info || '');
         setValue('returns_guarantee', product.returns_guarantee || '');
-        setActiveSizesFromDimensions(dimensions);
       } catch {
         toast.error('Failed to load product');
       }
@@ -1107,9 +1070,8 @@ const ProductForm = () => {
             const measurement = (row.measurement || '').trim();
             const values = Object.fromEntries(
               Object.entries(row.values || {})
-                .filter(([key]) => activeDimensionSizes.includes(key))
                 .map(([key, value]) => [key, String(value || '').trim()])
-                .filter(([, value]) => (value as string).length > 0)
+                .filter(([, value]) => value.length > 0)
             );
             return { measurement, values };
           })
@@ -1636,6 +1598,16 @@ const ProductForm = () => {
                     placeholder="Image URL (optional; overrides swatch color)"
                     className="text-sm"
                   />
+                  <Input
+                    type="file"
+                    accept="image/*"
+                    className="text-sm cursor-pointer bg-white"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleUploadColorImage(file, index);
+                    }}
+                  />
+                  {isUploading && <p className="text-xs text-muted-foreground">Uploading...</p>}
                 </div>
                 <Button type="button" variant="ghost" size="icon" onClick={() => removeColor(index)}>
                   <Trash2 className="h-4 w-4 text-destructive" />
@@ -2110,20 +2082,16 @@ const ProductForm = () => {
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() => {
-                      const sizes = activeDimensionSizes.length ? activeDimensionSizes : DIMENSION_SIZE_COLUMNS;
-                      const next = adjustWidthForWingback(
-                        DEFAULT_DIMENSION_ROWS.map((row) => ({
-                          measurement: row.measurement,
-                          values: Object.fromEntries(
-                            sizes.map((size) => [size, (row.values as Record<string, string>)[size] || ''])
-                          ),
-                        }))
-                      );
-                      replaceDimensions(next);
-                      ensureSizeKeysExist(sizes);
-                      setActiveDimensionSizes(sizes);
-                    }}
+                    onClick={() =>
+                      replaceDimensions(
+                        adjustWidthForWingback(
+                          DEFAULT_DIMENSION_ROWS.map((row) => ({
+                            measurement: row.measurement,
+                            values: { ...row.values },
+                          }))
+                        )
+                      )
+                    }
                   >
                     Apply Default Dimensions
                   </Button>
@@ -2131,33 +2099,14 @@ const ProductForm = () => {
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() => {
-                      const sizes = activeDimensionSizes.length ? activeDimensionSizes : DIMENSION_SIZE_COLUMNS;
+                    onClick={() =>
                       appendDimension({
                         measurement: '',
-                        values: Object.fromEntries(sizes.map((size) => [size, ''])),
-                      });
-                      ensureSizeKeysExist(sizes);
-                    }}
+                        values: Object.fromEntries(DIMENSION_SIZE_COLUMNS.map((size) => [size, ''])),
+                      })
+                    }
                   >
                     <Plus className="h-4 w-4 mr-2" /> Add Dimension Row
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={removeFirstTwoSizeColumns}
-                    title="Hide 2ft6 Small Single and 3ft Single for this product"
-                  >
-                    Remove First 2 Columns
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={restoreAllSizeColumns}
-                  >
-                    Show All Columns
                   </Button>
                 </div>
               </div>
@@ -2171,20 +2120,8 @@ const ProductForm = () => {
                   <thead className="bg-muted/60">
                     <tr>
                       <th className="p-2 text-left font-medium whitespace-nowrap">Measurement</th>
-                      {activeDimensionSizes.map((size) => (
-                        <th key={size} className="p-2 text-left font-medium whitespace-nowrap">
-                          <div className="flex items-center gap-2">
-                            <span>{size}</span>
-                            <button
-                              type="button"
-                              className="rounded-full p-1 text-xs text-destructive hover:bg-destructive/10"
-                              title={`Remove ${size} for this product`}
-                              onClick={() => removeSizeColumn(size)}
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </button>
-                          </div>
-                        </th>
+                      {DIMENSION_SIZE_COLUMNS.map((size) => (
+                        <th key={size} className="p-2 text-left font-medium whitespace-nowrap">{size}</th>
                       ))}
                       <th className="p-2 text-left font-medium whitespace-nowrap">Action</th>
                     </tr>
@@ -2200,7 +2137,7 @@ const ProductForm = () => {
                             className="whitespace-nowrap"
                           />
                         </td>
-                        {activeDimensionSizes.map((size) => (
+                        {DIMENSION_SIZE_COLUMNS.map((size) => (
                           <td key={`${field.id}-${size}`} className="p-2 align-top whitespace-nowrap min-w-[175px]">
                             <Controller
                               control={control}
@@ -2230,7 +2167,7 @@ const ProductForm = () => {
                     ))}
                     {dimensionFields.length === 0 && (
                       <tr>
-                        <td colSpan={activeDimensionSizes.length + 2} className="p-4 text-center text-muted-foreground">
+                        <td colSpan={DIMENSION_SIZE_COLUMNS.length + 2} className="p-4 text-center text-muted-foreground">
                           No dimensions added yet. Click "Apply Default Dimensions" or add rows manually.
                         </td>
                       </tr>
