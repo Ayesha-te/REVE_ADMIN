@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -47,6 +47,7 @@ const Categories = () => {
   });
   const [quickFilterOptions, setQuickFilterOptions] = useState<{ name: string }[]>([{ name: '' }]);
   const [isCreatingType, setIsCreatingType] = useState(false);
+  const descriptionRef = useRef<HTMLTextAreaElement | null>(null);
 
   const loadData = async () => {
     try {
@@ -379,6 +380,17 @@ const Categories = () => {
     return `Filter #${id}`;
   };
 
+  const escapeHtml = (value?: string) =>
+    (value || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+
+  const renderRichText = (value?: string) => {
+    const safe = escapeHtml(value);
+    return safe.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  };
+
   const openFilterTypeEditor = (filterTypeId: number) => {
     const ft = filterTypes.find((f) => f.id === filterTypeId);
     if (ft) {
@@ -473,6 +485,21 @@ const Categories = () => {
     } finally {
       setIsUploading(false);
     }
+  };
+
+  const handleBoldDescription = () => {
+    const textarea = descriptionRef.current;
+    if (!textarea) return;
+    const { selectionStart, selectionEnd, value } = textarea;
+    if (selectionStart === selectionEnd) return;
+    const selected = value.substring(selectionStart, selectionEnd);
+    const wrapped = `**${selected}**`;
+    const newValue = value.slice(0, selectionStart) + wrapped + value.slice(selectionEnd);
+    setSubCategoryFormData((prev) => ({ ...prev, description: newValue }));
+    setTimeout(() => {
+      textarea.focus();
+      textarea.setSelectionRange(selectionStart, selectionEnd + 4);
+    }, 0);
   };
 
   return (
@@ -610,7 +637,10 @@ const Categories = () => {
                           )}
                           <div className="flex-1">
                             <div className="font-medium text-lg">{sub.name}</div>
-                            <p className="text-sm text-muted-foreground mt-1">{sub.description}</p>
+                            <p
+                              className="text-sm text-muted-foreground mt-1"
+                              dangerouslySetInnerHTML={{ __html: renderRichText(sub.description) }}
+                            />
                             <p className="text-xs text-muted-foreground mt-2">
                               <span className="font-medium">Products ({productIds.length}):</span>{' '}
                               {productIds.length > 0 ? getProductNames(productIds) : 'None'}
@@ -875,12 +905,27 @@ const Categories = () => {
               </div>
 
               <div className="grid gap-2">
-                <label className="text-sm font-medium">Description</label>
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium">Description</label>
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={handleBoldDescription}
+                      className="h-8 px-3"
+                    >
+                      Bold
+                    </Button>
+                    <span>Tip: select text and click Bold to wrap with ** **</span>
+                  </div>
+                </div>
                 <textarea
+                  ref={descriptionRef}
                   value={subCategoryFormData.description}
                   onChange={(e) => setSubCategoryFormData({ ...subCategoryFormData, description: e.target.value })}
                   className="flex min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  placeholder="Brief description of this subcategory..."
+                  placeholder="Brief description of this subcategory... (supports **bold**)"
                 />
               </div>
 

@@ -289,6 +289,7 @@ const ProductForm = () => {
   const [filterTypes, setFilterTypes] = useState<FilterType[]>([]);
   const [filterOptions, setFilterOptions] = useState<FilterOption[]>([]);
   const [categoryFilterOptions, setCategoryFilterOptions] = useState<FilterOption[]>([]);
+  const [activeDimensionSizes, setActiveDimensionSizes] = useState<string[]>(DIMENSION_SIZE_COLUMNS);
 
   const { register, control, handleSubmit, formState: { errors }, setValue, watch } = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
@@ -363,6 +364,55 @@ const ProductForm = () => {
       });
       return { ...row, values: adjustedValues };
     });
+  };
+
+  const setActiveSizesFromDimensions = (dimensions: ProductDimensionRow[]) => {
+    const used = new Set<string>();
+    dimensions.forEach((row) => {
+      Object.entries(row.values || {}).forEach(([size, value]) => {
+        if (String(value || '').trim()) used.add(size);
+      });
+    });
+    if (used.size === 0) {
+      setActiveDimensionSizes(DIMENSION_SIZE_COLUMNS);
+      return;
+    }
+    const ordered = DIMENSION_SIZE_COLUMNS.filter((size) => used.has(size));
+    setActiveDimensionSizes(ordered.length > 0 ? ordered : Array.from(used));
+  };
+
+  const clearDimensionValuesForSizes = (sizes: string[]) => {
+    const currentDimensions = watch('dimensions') || [];
+    currentDimensions.forEach((row, idx) => {
+      sizes.forEach((size) => setValue(`dimensions.${idx}.values.${size}`, ''));
+    });
+  };
+
+  const ensureSizeKeysExist = (sizes: string[]) => {
+    const currentDimensions = watch('dimensions') || [];
+    currentDimensions.forEach((row, idx) => {
+      sizes.forEach((size) => {
+        if (!Object.prototype.hasOwnProperty.call(row.values || {}, size)) {
+          setValue(`dimensions.${idx}.values.${size}`, '');
+        }
+      });
+    });
+  };
+
+  const removeSizeColumn = (size: string) => {
+    setActiveDimensionSizes((prev) => prev.filter((s) => s !== size));
+    clearDimensionValuesForSizes([size]);
+  };
+
+  const removeFirstTwoSizeColumns = () => {
+    const toRemove = DIMENSION_SIZE_COLUMNS.slice(0, 2);
+    setActiveDimensionSizes((prev) => prev.filter((s) => !toRemove.includes(s)));
+    clearDimensionValuesForSizes(toRemove);
+  };
+
+  const restoreAllSizeColumns = () => {
+    setActiveDimensionSizes(DIMENSION_SIZE_COLUMNS);
+    ensureSizeKeysExist(DIMENSION_SIZE_COLUMNS);
   };
 
   const { fields: imageFields, append: appendImage, remove: removeImage, replace: replaceImages } = useFieldArray({
@@ -631,6 +681,7 @@ const ProductForm = () => {
         setValue('features', product.features || []);
         setValue('delivery_info', product.delivery_info || '');
         setValue('returns_guarantee', product.returns_guarantee || '');
+        setActiveSizesFromDimensions(dimensions);
       } catch {
         toast.error('Failed to load product');
       }
@@ -760,6 +811,48 @@ const ProductForm = () => {
       toast.success(`Imported ${fabrics.length} fabric${fabrics.length === 1 ? '' : 's'} from ${product.name}`);
     } catch {
       toast.error('Failed to import fabrics from that product');
+    }
+  };
+
+  const importShortDescriptionFromProduct = async () => {
+    if (!selectedImportProductId) {
+      toast.error('Select a product to import the short description');
+      return;
+    }
+    try {
+      const product = await apiGet<Product>(`/products/${selectedImportProductId}/`);
+      const incoming = (product.short_description || '').trim();
+      if (!incoming) {
+        toast.error('Selected product has no short description to import');
+        return;
+      }
+      const current = (watch('short_description') || '').trim();
+      const merged = current ? `${current}\n\n${incoming}` : incoming;
+      setValue('short_description', merged);
+      toast.success(`Imported short description from ${product.name}`);
+    } catch {
+      toast.error('Failed to import short description from that product');
+    }
+  };
+
+  const importLongDescriptionFromProduct = async () => {
+    if (!selectedImportProductId) {
+      toast.error('Select a product to import the long description');
+      return;
+    }
+    try {
+      const product = await apiGet<Product>(`/products/${selectedImportProductId}/`);
+      const incoming = (product.description || '').trim();
+      if (!incoming) {
+        toast.error('Selected product has no long description to import');
+        return;
+      }
+      const current = (watch('description') || '').trim();
+      const merged = current ? `${current}\n\n${incoming}` : incoming;
+      setValue('description', merged);
+      toast.success(`Imported long description from ${product.name}`);
+    } catch {
+      toast.error('Failed to import long description from that product');
     }
   };
 
@@ -1013,7 +1106,10 @@ const ProductForm = () => {
           .map((row) => {
             const measurement = (row.measurement || '').trim();
             const values = Object.fromEntries(
-              Object.entries(row.values || {}).map(([key, value]) => [key, String(value || '').trim()])
+              Object.entries(row.values || {})
+                .filter(([key]) => activeDimensionSizes.includes(key))
+                .map(([key, value]) => [key, String(value || '').trim()])
+                .filter(([, value]) => value.length > 0)
             );
             return { measurement, values };
           })
@@ -1406,6 +1502,12 @@ const ProductForm = () => {
                 </Button>
                 <Button type="button" variant="outline" size="sm" onClick={importFabricsFromProduct}>
                   Import fabrics
+                </Button>
+                <Button type="button" variant="outline" size="sm" onClick={importShortDescriptionFromProduct}>
+                  Import short desc
+                </Button>
+                <Button type="button" variant="outline" size="sm" onClick={importLongDescriptionFromProduct}>
+                  Import long desc
                 </Button>
                 <Button type="button" variant="outline" size="sm" onClick={importFaqsFromProduct}>
                   Import FAQs
@@ -2008,16 +2110,20 @@ const ProductForm = () => {
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() =>
-                      replaceDimensions(
-                        adjustWidthForWingback(
-                          DEFAULT_DIMENSION_ROWS.map((row) => ({
-                            measurement: row.measurement,
-                            values: { ...row.values },
-                          }))
-                        )
-                      )
-                    }
+                    onClick={() => {
+                      const sizes = activeDimensionSizes.length ? activeDimensionSizes : DIMENSION_SIZE_COLUMNS;
+                      const next = adjustWidthForWingback(
+                        DEFAULT_DIMENSION_ROWS.map((row) => ({
+                          measurement: row.measurement,
+                          values: Object.fromEntries(
+                            sizes.map((size) => [size, row.values[size] || ''])
+                          ),
+                        }))
+                      );
+                      replaceDimensions(next);
+                      ensureSizeKeysExist(sizes);
+                      setActiveDimensionSizes(sizes);
+                    }}
                   >
                     Apply Default Dimensions
                   </Button>
@@ -2025,14 +2131,33 @@ const ProductForm = () => {
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() =>
+                    onClick={() => {
+                      const sizes = activeDimensionSizes.length ? activeDimensionSizes : DIMENSION_SIZE_COLUMNS;
                       appendDimension({
                         measurement: '',
-                        values: Object.fromEntries(DIMENSION_SIZE_COLUMNS.map((size) => [size, ''])),
-                      })
-                    }
+                        values: Object.fromEntries(sizes.map((size) => [size, ''])),
+                      });
+                      ensureSizeKeysExist(sizes);
+                    }}
                   >
                     <Plus className="h-4 w-4 mr-2" /> Add Dimension Row
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={removeFirstTwoSizeColumns}
+                    title="Hide 2ft6 Small Single and 3ft Single for this product"
+                  >
+                    Remove First 2 Columns
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={restoreAllSizeColumns}
+                  >
+                    Show All Columns
                   </Button>
                 </div>
               </div>
@@ -2046,8 +2171,20 @@ const ProductForm = () => {
                   <thead className="bg-muted/60">
                     <tr>
                       <th className="p-2 text-left font-medium whitespace-nowrap">Measurement</th>
-                      {DIMENSION_SIZE_COLUMNS.map((size) => (
-                        <th key={size} className="p-2 text-left font-medium whitespace-nowrap">{size}</th>
+                      {activeDimensionSizes.map((size) => (
+                        <th key={size} className="p-2 text-left font-medium whitespace-nowrap">
+                          <div className="flex items-center gap-2">
+                            <span>{size}</span>
+                            <button
+                              type="button"
+                              className="rounded-full p-1 text-xs text-destructive hover:bg-destructive/10"
+                              title={`Remove ${size} for this product`}
+                              onClick={() => removeSizeColumn(size)}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </button>
+                          </div>
+                        </th>
                       ))}
                       <th className="p-2 text-left font-medium whitespace-nowrap">Action</th>
                     </tr>
@@ -2063,7 +2200,7 @@ const ProductForm = () => {
                             className="whitespace-nowrap"
                           />
                         </td>
-                        {DIMENSION_SIZE_COLUMNS.map((size) => (
+                        {activeDimensionSizes.map((size) => (
                           <td key={`${field.id}-${size}`} className="p-2 align-top whitespace-nowrap min-w-[175px]">
                             <Controller
                               control={control}
@@ -2093,7 +2230,7 @@ const ProductForm = () => {
                     ))}
                     {dimensionFields.length === 0 && (
                       <tr>
-                        <td colSpan={DIMENSION_SIZE_COLUMNS.length + 2} className="p-4 text-center text-muted-foreground">
+                        <td colSpan={activeDimensionSizes.length + 2} className="p-4 text-center text-muted-foreground">
                           No dimensions added yet. Click "Apply Default Dimensions" or add rows manually.
                         </td>
                       </tr>
