@@ -83,6 +83,7 @@ export interface ProductMattress {
   description?: string;
   image_url?: string;
   price?: number | null;
+  enable_bunk_positions?: boolean;
   source_product?: number | null;
   source_product_name?: string | null;
   source_product_slug?: string | null;

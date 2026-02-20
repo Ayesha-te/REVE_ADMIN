@@ -150,6 +150,7 @@ const createProductSchema = (requireImages: boolean) =>
           description: z.string().optional(),
           image_url: z.string().optional(),
           price: z.number().nullable().optional(),
+          enable_bunk_positions: z.boolean().optional(),
           source_product: z.number().nullable().optional(),
         })
       )
@@ -302,6 +303,7 @@ const ProductForm = () => {
       styles: [],
       fabrics: [],
       mattresses: [],
+      // allow bunk position selection per mattress when enabled
       is_bestseller: false,
       is_new: false,
       show_size_icons: true,
@@ -603,6 +605,7 @@ const ProductForm = () => {
           description: m.description || '',
           image_url: m.image_url || '',
           price: m.price !== undefined && m.price !== null ? Number(m.price) : null,
+          enable_bunk_positions: m.enable_bunk_positions ?? false,
           source_product: m.source_product || null,
         }));
         const faqs = (product.faqs || []).map((faq) => ({
@@ -1080,6 +1083,7 @@ const ProductForm = () => {
             name: (m.name || '').trim(),
             description: (m.description || '').trim(),
             image_url: (m.image_url || '').trim(),
+            enable_bunk_positions: Boolean(m.enable_bunk_positions),
             price: (() => {
               const raw = (m as { price?: unknown })?.price;
               if (raw === null || raw === undefined || raw === '') return null;
@@ -1838,7 +1842,7 @@ const ProductForm = () => {
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() => appendMattress({ name: '', description: '', image_url: '', price: null, source_product: null })}
+                    onClick={() => appendMattress({ name: '', description: '', image_url: '', price: null, source_product: null, enable_bunk_positions: false })}
                   >
                     <Plus className="h-4 w-4 mr-2" /> Add Mattress
                   </Button>
@@ -1892,6 +1896,14 @@ const ProductForm = () => {
                         }}
                         className="col-span-1 cursor-pointer bg-black/5"
                       />
+                      <label className="col-span-2 flex items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(watch(`mattresses.${index}.enable_bunk_positions`))}
+                          onChange={(e) => setValue(`mattresses.${index}.enable_bunk_positions`, e.target.checked)}
+                        />
+                        Allow bunk selection (Top / Bottom / Both) for this mattress; “Both” charges 2× price.
+                      </label>
                     </div>
                     {watch(`mattresses.${index}.image_url`) && (
                       <img
@@ -2383,7 +2395,7 @@ const ProductForm = () => {
                   variant="outline"
                   size="sm"
                   onClick={() => replaceFilterValues([])}
-                  disabled={(categoryFilterOptions.length === 0 && filterOptions.length === 0)}
+                  disabled={categoryFilterOptions.length === 0}
                 >
                   Clear
                 </Button>
@@ -2400,30 +2412,12 @@ const ProductForm = () => {
                 );
 
                 const optionList =
-                  categoryFilterOptions.length > 0
-                    ? categoryFilterOptions
-                        .filter((opt) => opt.is_active !== false)
-                        .map((opt) => ({
-                          id: opt.id,
-                          label: `${opt.filter_type_name || 'Filter'} — ${opt.name}`,
-                        }))
-                    : filterOptions.length > 0
-                    ? filterOptions
-                        .filter((opt) => opt.is_active !== false)
-                        .map((opt) => ({
-                          id: opt.id,
-                          label: `${opt.filter_type_name || 'Filter'} — ${opt.name}`,
-                        }))
-                    : filterTypes
-                        .filter((ft) => ft.is_active !== false)
-                        .flatMap((ft) =>
-                          (ft.options || [])
-                            .filter((opt) => opt.is_active !== false)
-                            .map((opt) => ({
-                              id: opt.id,
-                              label: `${ft.name} — ${opt.name}`,
-                            }))
-                        );
+                  categoryFilterOptions
+                    .filter((opt) => opt.is_active !== false)
+                    .map((opt) => ({
+                      id: opt.id,
+                      label: `${opt.filter_type_name || 'Filter'} — ${opt.name}`,
+                    }));
 
                 const toggleId = (id: number, checked: boolean) => {
                   const next = new Set(selectedIds);
