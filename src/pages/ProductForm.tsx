@@ -1072,14 +1072,18 @@ const ProductForm = () => {
             const values = Object.fromEntries(
               Object.entries(row.values || {})
                 .map(([key, value]) => {
-                  const str = String(value as unknown as string | number | boolean | null | undefined ?? '').trim();
+                  const str = (value ?? '').toString().trim();
                   return [key, str];
                 })
                 .filter(([, str]) => str.length > 0)
             );
             return { measurement, values };
           })
-          .filter((row) => row.measurement.length > 0 && Object.values(row.values).some((value) => value.length > 0)),
+          .filter(
+            (row) =>
+              row.measurement.length > 0 &&
+              Object.values(row.values).some((value) => (value as string).length > 0)
+          ),
         faqs: (data.faqs || [])
           .map((faq) => ({
             question: (faq.question || '').trim(),
