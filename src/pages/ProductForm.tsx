@@ -6,7 +6,7 @@ import { Input } from '../components/ui/input';
 import { Plus, Trash2, ArrowLeft } from 'lucide-react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { toast } from 'sonner';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import type { FieldErrors } from 'react-hook-form';
 import { apiGet, apiPost, apiPut, apiUpload } from '../lib/api';
@@ -406,6 +406,7 @@ const ProductForm = () => {
     control,
     name: "colors"
   });
+  const colorFileInputRefs = useRef<HTMLInputElement[]>([]);
 
   const { fields: fabricFields, append: appendFabric, remove: removeFabric, replace: replaceFabrics } = useFieldArray({
     control,
@@ -1596,21 +1597,36 @@ const ProductForm = () => {
                     placeholder="Custom color name (optional)"
                     className="text-sm"
                   />
-                  <Input
-                    {...register(`colors.${index}.image_url` as const)}
-                    placeholder="Image URL (optional; overrides swatch color)"
-                    className="text-sm"
-                  />
-                  <Input
-                    type="file"
-                    accept="image/*"
-                    className="text-sm cursor-pointer bg-white"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) handleUploadColorImage(file, index);
-                    }}
-                  />
-                  {isUploading && <p className="text-xs text-muted-foreground">Uploading...</p>}
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <Input
+                        {...register(`colors.${index}.image_url` as const)}
+                        placeholder="Image URL (optional; overrides swatch color)"
+                        className="text-sm flex-1"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => colorFileInputRefs.current[index]?.click()}
+                      >
+                        Choose file
+                      </Button>
+                    </div>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      ref={(el) => {
+                        if (el) colorFileInputRefs.current[index] = el;
+                      }}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleUploadColorImage(file, index);
+                      }}
+                    />
+                    {isUploading && <p className="text-xs text-muted-foreground">Uploading...</p>}
+                  </div>
                 </div>
                 <Button type="button" variant="ghost" size="icon" onClick={() => removeColor(index)}>
                   <Trash2 className="h-4 w-4 text-destructive" />
