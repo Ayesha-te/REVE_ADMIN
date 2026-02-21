@@ -297,6 +297,8 @@ const ProductForm = () => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [subcategories, setSubcategories] = useState<SubCategory[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  // Track whether filter selections changed so we don't wipe them on save
+  const [filterValuesDirty, setFilterValuesDirty] = useState(false);
   const [mattressImportId, setMattressImportId] = useState('');
   const [importProductOptions, setImportProductOptions] = useState<Product[]>([]);
   const [selectedImportProductId, setSelectedImportProductId] = useState<number | null>(null);
@@ -674,6 +676,7 @@ const ProductForm = () => {
               .filter((fv) => fv.filter_option)
           : [];
         replaceFilterValues(filterValues);
+        setFilterValuesDirty(false);
         replaceImages(images);
         replaceVideos(videos);
         replaceColors(colors);
@@ -1230,6 +1233,11 @@ const ProductForm = () => {
       }
       if (!payload.faqs || payload.faqs.length === 0) {
         delete (payload as Partial<ProductFormValues>).faqs;
+      }
+
+      // Preserve existing filters when editing unless the user changed/cleared them.
+      if (isEditing && !filterValuesDirty && (!payload.filter_values || payload.filter_values.length === 0)) {
+        delete (payload as Partial<ProductFormValues>).filter_values;
       }
 
       const payloadSize = new Blob([JSON.stringify(payload)]).size;
@@ -2550,7 +2558,10 @@ const ProductForm = () => {
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => replaceFilterValues([])}
+                  onClick={() => {
+                    replaceFilterValues([]);
+                    setFilterValuesDirty(true);
+                  }}
                   disabled={categoryFilterOptions.length === 0}
                 >
                   Clear
@@ -2593,8 +2604,11 @@ const ProductForm = () => {
                           <input
                             type="checkbox"
                             checked={selectedIds.has(opt.id)}
-                            onChange={(e) => toggleId(opt.id, e.target.checked)}
-                          />
+                        onChange={(e) => {
+                          setFilterValuesDirty(true);
+                          toggleId(opt.id, e.target.checked);
+                        }}
+                      />
                           <span>{opt.label}</span>
                         </label>
                       ))}
