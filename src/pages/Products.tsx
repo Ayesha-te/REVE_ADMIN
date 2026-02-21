@@ -26,7 +26,13 @@ const Products = () => {
         return [];
       };
 
-      setProducts(normalizeList(productsData));
+      const normalizedProducts = normalizeList(productsData).sort((a, b) => {
+        const aOrder = Number.isFinite(Number(a.sort_order)) ? Number(a.sort_order) : 0;
+        const bOrder = Number.isFinite(Number(b.sort_order)) ? Number(b.sort_order) : 0;
+        if (aOrder !== bOrder) return aOrder - bOrder;
+        return (b.id || 0) - (a.id || 0);
+      });
+      setProducts(normalizedProducts);
       setCategories(normalizeList(categoriesData));
     } catch {
       toast.error('Failed to load products');
@@ -106,6 +112,7 @@ const Products = () => {
             <TableHeader>
               <TableRow>
                 <TableHead>Name</TableHead>
+                <TableHead>Display Order</TableHead>
                 <TableHead>Category</TableHead>
                 <TableHead>Price</TableHead>
                 <TableHead>Stock</TableHead>
@@ -116,6 +123,7 @@ const Products = () => {
               {filteredProducts.map((product) => (
                 <TableRow key={product.id}>
                   <TableCell className="font-medium">{product.name}</TableCell>
+                  <TableCell>{Number.isFinite(Number(product.sort_order)) ? product.sort_order : 0}</TableCell>
                   <TableCell>{product.category_name || product.category}</TableCell>
                   <TableCell>£{product.price}</TableCell>
                   <TableCell>
@@ -146,7 +154,7 @@ const Products = () => {
               ))}
               {filteredProducts.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-sm text-muted-foreground py-6">
+                  <TableCell colSpan={6} className="text-center text-sm text-muted-foreground py-6">
                     No products found for this category.
                   </TableCell>
                 </TableRow>

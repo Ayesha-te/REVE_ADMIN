@@ -87,6 +87,7 @@ const createProductSchema = (requireImages: boolean) =>
     original_price: z.number().nullable().optional(),
     discount_percentage: z.number().min(0).max(100).optional().nullable(),
     delivery_charges: z.number().min(0).optional().nullable(),
+    sort_order: z.number().optional(),
     is_bestseller: z.boolean().optional(),
     is_new: z.boolean().optional(),
     show_size_icons: z.boolean().optional(),
@@ -320,6 +321,7 @@ const ProductForm = () => {
       show_size_icons: true,
       discount_percentage: 0,
       delivery_charges: 0,
+      sort_order: 0,
       features: [],
       dimensions: [],
       dimension_paragraph: '',
@@ -580,6 +582,7 @@ const ProductForm = () => {
         setValue('is_bestseller', product.is_bestseller);
         setValue('is_new', product.is_new);
         setValue('show_size_icons', product.show_size_icons !== false);
+        setValue('sort_order', Number.isFinite(Number(product.sort_order)) ? Number(product.sort_order) : 0);
         const images = product.images.map((i) => ({ url: i.url, color_name: i.color_name || '' }));
         const videos = product.videos.map((v) => ({ url: v.url }));
         const colors = product.colors.map((c) => ({
@@ -1031,6 +1034,7 @@ const ProductForm = () => {
           ? Number(data.delivery_charges)
           : 0,
         show_size_icons: data.show_size_icons !== false,
+        sort_order: Number.isFinite(data.sort_order) ? Number(data.sort_order) : 0,
         short_description: data.short_description.trim(),
         description: data.description.trim(),
         discount_percentage: Number.isFinite(discountPercentage) ? discountPercentage : 0,
@@ -1326,7 +1330,7 @@ const ProductForm = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="grid gap-2">
                 <label className="text-sm font-medium">Price (Â£) *</label>
                 <Input type="number" {...register('price', { valueAsNumber: true })} />
@@ -1341,6 +1345,20 @@ const ProductForm = () => {
                   min="0"
                   max="99"
                 />
+              </div>
+              <div className="grid gap-2">
+                <label className="text-sm font-medium">Display Order</label>
+                <Input
+                  type="number"
+                  {...register('sort_order', {
+                    setValueAs: (value) => {
+                      const n = Number(value);
+                      return Number.isNaN(n) ? 0 : n;
+                    },
+                  })}
+                  placeholder="0 (lower shows first)"
+                />
+                <p className="text-[11px] text-muted-foreground">Lower numbers appear first in listings.</p>
               </div>
             </div>
 
