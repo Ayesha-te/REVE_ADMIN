@@ -57,11 +57,20 @@ const Categories = () => {
         apiGet<FilterType[]>('/filter-types/'),
         apiGet<CategoryFilter[]>('/category-filters/'),
       ]);
-      setCategories(categoriesRes);
+      // Keep categories and their subcategories ordered consistently so newly created
+      // subcategories appear immediately near the top instead of "somewhere later".
+      const sortedCategories = [...categoriesRes]
+        .map((c) => ({
+          ...c,
+          subcategories: [...(c.subcategories || [])].sort((a, b) => a.name.localeCompare(b.name)),
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+
+      setCategories(sortedCategories);
       setProducts(productsRes);
       setFilterTypes(filterTypesRes);
       setCategoryFilters(catFiltersRes);
-      setExpandedCategories(new Set(categoriesRes.map((c) => c.id)));
+      setExpandedCategories(new Set(sortedCategories.map((c) => c.id)));
     } catch {
       toast.error('Failed to load categories');
     }
@@ -123,7 +132,8 @@ const Categories = () => {
   const openFilterModal = (categoryId: number) => {
     setFilterTargetCategoryId(categoryId);
     setFilterForm({
-      filter_type: filterTypes[0] ? String(filterTypes[0].id) : '',
+      // Force an explicit choice so we don’t auto-assign the first filter type
+      filter_type: '',
       subcategory: '',
       display_order: 0,
       is_active: true,
@@ -183,11 +193,15 @@ const Categories = () => {
       ? filterTypes.find((ft) => ft.name.trim().toLowerCase() === quickName.toLowerCase())
       : undefined;
 
+    const explicitSelection = Number.isFinite(Number(filterForm.filter_type))
+      ? Number(filterForm.filter_type)
+      : null;
+
     let chosenFilterTypeId =
       existingByName?.id ||
-      Number(filterForm.filter_type) ||
+      explicitSelection ||
       lastCreatedFilterTypeId ||
-      (filterTypes[0]?.id ?? null);
+      null;
 
     const needCreateFromQuickName =
       quickName.length > 0 &&
@@ -201,7 +215,12 @@ const Categories = () => {
       }
     }
 
-    if (!filterTargetCategoryId || !chosenFilterTypeId) {
+    if (!filterTargetCategoryId) {
+      toast.error('Select a category before assigning a filter.');
+      return;
+    }
+
+    if (!chosenFilterTypeId) {
       toast.error('Select or create a filter type first.');
       return;
     }

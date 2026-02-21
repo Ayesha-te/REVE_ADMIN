@@ -521,7 +521,18 @@ const ProductForm = () => {
         );
 
         const filters = Array.isArray(catRes?.filters) ? catRes.filters : [];
-        const opts = filters.flatMap((ft) =>
+
+        // Only show filters that are explicitly assigned to the selected subcategory.
+        const subId = selectedSubcategory ? Number(selectedSubcategory) : null;
+        // When a subcategory is selected, include both subcategory-specific filters
+        // and category-wide filters so shared filters (e.g., size) still show up.
+        const applicableFilters = subId
+          ? filters.filter(
+              (ft: any) => Number(ft.subcategory) === subId || !ft.subcategory
+            )
+          : filters.filter((ft: any) => !ft.subcategory);
+
+        const opts = applicableFilters.flatMap((ft) =>
           (ft.options || []).map((opt) => ({
             ...opt,
             filter_type: ft.id,
