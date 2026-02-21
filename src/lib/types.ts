@@ -108,8 +108,11 @@ export interface Product {
   name: string;
   slug: string;
   category: number;
+  // Some endpoints return the category/subcategory slugs instead of IDs; keep both for filtering.
+  category_slug?: string;
   category_name?: string;
   subcategory?: number | null;
+  subcategory_slug?: string;
   subcategory_name?: string;
   price: number;
   original_price?: number | null;

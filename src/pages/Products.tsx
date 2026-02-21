@@ -11,7 +11,7 @@ import { toast } from 'sonner';
 const Products = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [selectedCategoryId, setSelectedCategoryId] = useState<number | 'all'>('all');
+  const [selectedCategory, setSelectedCategory] = useState<string | 'all'>('all');
 
   const loadData = async () => {
     try {
@@ -55,18 +55,30 @@ const Products = () => {
   };
 
   const filteredProducts = useMemo(() => {
-    if (selectedCategoryId === 'all') return products;
-    const selectedCategory = categories.find((c) => Number(c.id) === Number(selectedCategoryId));
-    const selectedName = (selectedCategory?.name || '').toLowerCase();
+    if (selectedCategory === 'all') return products;
+
+    const targetCategory = categories.find(
+      (c) => c.slug === selectedCategory || String(c.id) === selectedCategory
+    );
+
+    const targetSlug = (targetCategory?.slug || '').toLowerCase();
+    const targetId = targetCategory?.id;
+    const targetName = (targetCategory?.name || '').toLowerCase();
+
     return products.filter((product) => {
+      const productSlug = (product.category_slug || '').toLowerCase();
       const productCategoryId = Number(product.category);
       const productCategoryName = (product.category_name || '').toLowerCase();
-      return (
-        productCategoryId === Number(selectedCategoryId) ||
-        (selectedName && productCategoryName === selectedName)
-      );
+
+      const matchesSlug = targetSlug ? productSlug === targetSlug : false;
+      const matchesId = targetId != null && Number.isFinite(productCategoryId)
+        ? productCategoryId === targetId
+        : false;
+      const matchesName = targetName ? productCategoryName === targetName : false;
+
+      return matchesSlug || matchesId || matchesName;
     });
-  }, [products, categories, selectedCategoryId]);
+  }, [products, categories, selectedCategory]);
 
   return (
     <div className="space-y-6">
@@ -86,21 +98,21 @@ const Products = () => {
         <label className="text-sm font-medium text-muted-foreground">Filter by category</label>
         <select
           className="min-w-[220px] rounded-md border border-input bg-white px-3 py-2 text-sm"
-          value={selectedCategoryId === 'all' ? '' : selectedCategoryId}
+          value={selectedCategory === 'all' ? '' : selectedCategory}
           onChange={(e) => {
             const val = e.target.value;
-            setSelectedCategoryId(val === '' ? 'all' : Number(val));
+            setSelectedCategory(val === '' ? 'all' : val);
           }}
         >
           <option value="">All categories</option>
           {categories.map((cat) => (
-            <option key={cat.id} value={cat.id}>
+            <option key={cat.id} value={cat.slug || String(cat.id)}>
               {cat.name}
             </option>
           ))}
         </select>
-        {selectedCategoryId !== 'all' && (
-          <Button variant="outline" size="sm" onClick={() => setSelectedCategoryId('all')}>
+        {selectedCategory !== 'all' && (
+          <Button variant="outline" size="sm" onClick={() => setSelectedCategory('all')}>
             Clear
           </Button>
         )}
@@ -124,7 +136,7 @@ const Products = () => {
                 <TableRow key={product.id}>
                   <TableCell className="font-medium">{product.name}</TableCell>
                   <TableCell>{Number.isFinite(Number(product.sort_order)) ? product.sort_order : 0}</TableCell>
-                  <TableCell>{product.category_name || product.category}</TableCell>
+                  <TableCell>{product.category_name || product.category_slug || product.category}</TableCell>
                   <TableCell>£{product.price}</TableCell>
                   <TableCell>
                     <span
