@@ -489,6 +489,7 @@ const ProductForm = () => {
     fields: dimensionImageFields,
     append: appendDimensionImage,
     remove: removeDimensionImage,
+    replace: replaceDimensionImages,
   } = useFieldArray({
     control,
     name: "dimension_images",
@@ -670,6 +671,7 @@ const ProductForm = () => {
         }));
         setValue('dimension_paragraph', product.dimension_paragraph || '');
         setValue('dimension_images', dimensionImages);
+        replaceDimensionImages(dimensionImages);
         setValue('show_dimensions_table', product.show_dimensions_table !== false);
         setDimensionColumns(deriveDimensionColumnsFromRows(dimensions));
         setValue('images', images);
@@ -1253,6 +1255,10 @@ const ProductForm = () => {
       }
       if (!payload.dimensions || payload.dimensions.length === 0) {
         delete (payload as Partial<ProductFormValues>).dimensions;
+      }
+      // Avoid wiping existing dimension images when editing if none are provided in the form payload.
+      if (isEditing && (!payload.dimension_images || payload.dimension_images.length === 0)) {
+        delete (payload as Partial<ProductFormValues>).dimension_images;
       }
       if (!payload.faqs || payload.faqs.length === 0) {
         delete (payload as Partial<ProductFormValues>).faqs;
