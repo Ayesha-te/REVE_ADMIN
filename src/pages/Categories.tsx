@@ -167,16 +167,35 @@ const Categories = () => {
       return null;
     }
     const baseSlug = slugify(quickFilterForm.name);
-    const uniqueSlug = ensureUniqueSlug(baseSlug);
-    const payload = {
-      name: quickFilterForm.name.trim(),
-      slug: uniqueSlug,
-      display_type: quickFilterForm.display_type,
-      is_expanded_by_default: quickFilterForm.is_expanded_by_default,
-    };
+    const attempts = [ensureUniqueSlug(baseSlug), ensureUniqueSlug(`${baseSlug}-${Date.now()}`)];
     try {
       setIsCreatingType(true);
-      const created = await apiPost<FilterType>('/filter-types/', payload);
+      let created: FilterType | null = null;
+      let lastError: unknown = null;
+      for (const slugCandidate of attempts) {
+        const payload = {
+          name: quickFilterForm.name.trim(),
+          slug: slugCandidate,
+          display_type: quickFilterForm.display_type,
+          is_expanded_by_default: quickFilterForm.is_expanded_by_default,
+        };
+        try {
+          created = await apiPost<FilterType>('/filter-types/', payload);
+          break;
+        } catch (err) {
+          lastError = err;
+          // if slug clash, try next candidate; otherwise abort
+          const msg = String(err || '').toLowerCase();
+          if (!msg.includes('slug') && !msg.includes('unique') && !msg.includes('exists')) {
+            throw err;
+          }
+        }
+      }
+      if (!created) {
+        throw lastError || new Error('Failed to create filter type');
+      }
+      // Make sure the new filter type is available in local state immediately
+      setFilterTypes((prev) => [...prev, created!]);
       const optionPayloads = quickFilterOptions
         .map((opt, idx) => ({
           name: (opt.name || '').trim(),
