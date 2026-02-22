@@ -121,6 +121,7 @@ export interface Product {
   short_description?: string;
   features: string[];
   dimensions?: ProductDimensionRow[];
+  dimension_images?: { size: string; url: string }[];
   show_dimensions_table?: boolean;
   faqs?: ProductFaq[];
   delivery_info?: string;

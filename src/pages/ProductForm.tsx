@@ -175,6 +175,14 @@ const createProductSchema = (requireImages: boolean) =>
         })
       )
       .optional(),
+    dimension_images: z
+      .array(
+        z.object({
+          size: z.string().optional(),
+          url: z.string().optional(),
+        })
+      )
+      .optional(),
     dimension_paragraph: z.string().optional(),
     show_dimensions_table: z.boolean().optional(),
     faqs: z
@@ -326,6 +334,7 @@ const ProductForm = () => {
       sort_order: 0,
       features: [],
       dimensions: [],
+      dimension_images: [],
       dimension_paragraph: '',
       show_dimensions_table: true,
       faqs: [],
@@ -474,6 +483,16 @@ const ProductForm = () => {
   } = useFieldArray({
     control,
     name: "dimensions"
+  });
+
+  const {
+    fields: dimensionImageFields,
+    append: appendDimensionImage,
+    remove: removeDimensionImage,
+    replace: replaceDimensionImages,
+  } = useFieldArray({
+    control,
+    name: "dimension_images",
   });
 
   useEffect(() => {
@@ -646,7 +665,12 @@ const ProductForm = () => {
           measurement: (row.measurement || '').trim(),
           values: row.values || {},
         }));
+        const dimensionImages = (product.dimension_images || []).map((img) => ({
+          size: (img.size || '').trim(),
+          url: (img.url || '').trim(),
+        }));
         setValue('dimension_paragraph', product.dimension_paragraph || '');
+        setValue('dimension_images', dimensionImages);
         setValue('show_dimensions_table', product.show_dimensions_table !== false);
         setDimensionColumns(deriveDimensionColumnsFromRows(dimensions));
         setValue('images', images);
@@ -1169,6 +1193,12 @@ const ProductForm = () => {
               row.measurement.length > 0 &&
               Object.values(row.values).some((value) => (value as string).length > 0)
           ),
+        dimension_images: (data.dimension_images || [])
+          .map((img) => ({
+            size: (img.size || '').trim(),
+            url: (img.url || '').trim(),
+          }))
+          .filter((img) => img.size.length > 0 && img.url.length > 0),
         dimension_paragraph: (data.dimension_paragraph || '').trim(),
         show_dimensions_table: data.show_dimensions_table !== false,
         faqs: (data.faqs || [])
@@ -1224,12 +1254,6 @@ const ProductForm = () => {
       }
       if (!payload.dimensions || payload.dimensions.length === 0) {
         delete (payload as Partial<ProductFormValues>).dimensions;
-      }
-      if (payload.show_dimensions_table === true) {
-        delete (payload as Partial<ProductFormValues>).show_dimensions_table;
-      }
-      if (!payload.dimension_paragraph) {
-        delete (payload as Partial<ProductFormValues>).dimension_paragraph;
       }
       if (!payload.faqs || payload.faqs.length === 0) {
         delete (payload as Partial<ProductFormValues>).faqs;
@@ -1461,7 +1485,10 @@ const ProductForm = () => {
             <div className="space-y-2">
               <label className="text-sm font-medium">Product Images *</label>
               {imageFields.map((field, index) => {
-                const colorOptions = (watch('colors') || []).map((c) => c.name).filter(Boolean);
+                const swatchColors = (watch('colors') || []).map((c) => c.name).filter(Boolean);
+                const fabricColors = (watch('fabrics') || [])
+                  .flatMap((f) => (f?.colors || []).map((c: any) => c?.name).filter(Boolean));
+                const colorOptions = Array.from(new Set([...swatchColors, ...fabricColors]));
                 return (
                 <div key={field.id} className="space-y-2">
                   <div className="flex gap-2">
@@ -2418,6 +2445,60 @@ const ProductForm = () => {
                 className="flex min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               />
               <p className="text-xs text-muted-foreground">If filled, the storefront will show this text. Leave empty to show the table above.</p>
+            </div>
+
+            <div className="grid gap-2">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium">Dimension Images (optional)</label>
+                <Button type="button" variant="outline" size="sm" onClick={() => appendDimensionImage({ size: '', url: '' })}>
+                  <Plus className="h-4 w-4 mr-2" /> Add Dimension Image
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Add an image per size to display inside the “View dimensions” modal. Leave empty to skip images.
+              </p>
+              <div className="space-y-3">
+                {dimensionImageFields.map((field, index) => (
+                  <div key={field.id} className="grid grid-cols-12 gap-2 items-start border rounded-md p-3">
+                    <Input
+                      className="col-span-4"
+                      placeholder="Size label (e.g. 4ft6 Double)"
+                      {...register(`dimension_images.${index}.size` as const)}
+                    />
+                    <Input
+                      className="col-span-6"
+                      placeholder="https://... image URL"
+                      {...register(`dimension_images.${index}.url` as const)}
+                    />
+                    <div className="col-span-2 flex items-center gap-2">
+                      <Input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            handleUpload(file, (url) => setValue(`dimension_images.${index}.url`, url));
+                          }
+                        }}
+                        className="flex-1 cursor-pointer bg-black/5"
+                      />
+                      <Button type="button" variant="ghost" size="icon" onClick={() => removeDimensionImage(index)}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                    {watch(`dimension_images.${index}.url`) && (
+                      <img
+                        src={watch(`dimension_images.${index}.url`) || undefined}
+                        alt="Dimension preview"
+                        className="col-span-12 h-32 w-auto object-contain rounded border mt-1"
+                      />
+                    )}
+                  </div>
+                ))}
+                {dimensionImageFields.length === 0 && (
+                  <p className="text-xs text-muted-foreground">No dimension images added.</p>
+                )}
+              </div>
             </div>
 
             <div className="grid gap-2">

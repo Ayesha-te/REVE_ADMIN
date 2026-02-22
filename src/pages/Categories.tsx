@@ -141,15 +141,36 @@ const Categories = () => {
     setShowFilterModal(true);
   };
 
+  const slugify = (value: string) =>
+    (value || '')
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-+|-+$/g, '') || 'filter';
+
+  const ensureUniqueSlug = (base: string) => {
+    const existing = new Set(filterTypes.map((ft) => ft.slug));
+    if (!existing.has(base)) return base;
+    let suffix = 2;
+    while (existing.has(`${base}-${suffix}`)) {
+      suffix += 1;
+    }
+    return `${base}-${suffix}`;
+  };
+
   // Creates a filter type from the quick form and returns it, or null on failure
   const createFilterTypeFromQuickForm = async () => {
     if (!quickFilterForm.name.trim()) {
       toast.error('Filter name is required');
       return null;
     }
+    const baseSlug = slugify(quickFilterForm.name);
+    const uniqueSlug = ensureUniqueSlug(baseSlug);
     const payload = {
       name: quickFilterForm.name.trim(),
-      slug: (quickFilterForm.name || '').toLowerCase().replace(/\s+/g, '-'),
+      slug: uniqueSlug,
       display_type: quickFilterForm.display_type,
       is_expanded_by_default: quickFilterForm.is_expanded_by_default,
     };
@@ -186,26 +207,13 @@ const Categories = () => {
 
   const handleSaveFilter = async () => {
     const quickName = quickFilterForm.name.trim();
-    const selectedFilterType = filterTypes.find((ft) => Number(ft.id) === Number(filterForm.filter_type));
-
-    // Prefer an exact name match (case-insensitive) if the user typed a quick name.
-    const existingByName = quickName
-      ? filterTypes.find((ft) => ft.name.trim().toLowerCase() === quickName.toLowerCase())
-      : undefined;
-
     const explicitSelection = Number.isFinite(Number(filterForm.filter_type))
       ? Number(filterForm.filter_type)
       : null;
 
-    let chosenFilterTypeId =
-      existingByName?.id ||
-      explicitSelection ||
-      lastCreatedFilterTypeId ||
-      null;
+    let chosenFilterTypeId = explicitSelection || lastCreatedFilterTypeId || null;
 
-    const needCreateFromQuickName =
-      quickName.length > 0 &&
-      (!existingByName && (!selectedFilterType || selectedFilterType.name.trim().toLowerCase() !== quickName.toLowerCase()));
+    const needCreateFromQuickName = quickName.length > 0 && !explicitSelection;
 
     if (needCreateFromQuickName) {
       const created = await createFilterTypeFromQuickForm();
