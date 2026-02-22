@@ -489,7 +489,6 @@ const ProductForm = () => {
     fields: dimensionImageFields,
     append: appendDimensionImage,
     remove: removeDimensionImage,
-    replace: replaceDimensionImages,
   } = useFieldArray({
     control,
     name: "dimension_images",
