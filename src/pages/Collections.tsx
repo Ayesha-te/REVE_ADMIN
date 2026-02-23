@@ -62,7 +62,7 @@ const Collections = () => {
       const res = await apiUpload('/uploads/', file);
       setForm((prev) => ({ ...prev, image: res.url }));
     } catch {
-      toast.error('Image upload failed');
+      toast.error('Image upload failed – please try again');
     } finally {
       setIsUploading(false);
     }
@@ -76,6 +76,10 @@ const Collections = () => {
   const handleSave = async () => {
     if (!form.name.trim()) {
       toast.error('Collection name is required');
+      return;
+    }
+    if (isUploading) {
+      toast.error('Please wait for the image upload to finish');
       return;
     }
     if (!form.image.trim()) {
