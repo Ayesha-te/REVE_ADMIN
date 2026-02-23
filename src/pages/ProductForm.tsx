@@ -305,6 +305,7 @@ const ProductForm = () => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [subcategories, setSubcategories] = useState<SubCategory[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   // Track whether filter selections changed so we don't wipe them on save
   const [filterValuesDirty, setFilterValuesDirty] = useState(false);
   const [mattressImportId, setMattressImportId] = useState('');
@@ -1046,6 +1047,8 @@ const ProductForm = () => {
   };
 
   const onSubmit = async (data: ProductFormValues) => {
+    if (isSaving) return;
+    setIsSaving(true);
     try {
       const discountPercentage =
         typeof data.discount_percentage === 'number' && !Number.isNaN(data.discount_percentage)
@@ -1286,6 +1289,8 @@ const ProductForm = () => {
       navigate('/products');
     } catch {
       toast.error('Failed to save product');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -2714,7 +2719,9 @@ const ProductForm = () => {
           <Link to="/products">
             <Button variant="outline" type="button">Cancel</Button>
           </Link>
-          <Button type="submit" className="px-8">Save Product</Button>
+          <Button type="submit" className="px-8" disabled={isSaving || isUploading}>
+            {isSaving ? 'Saving...' : 'Save Product'}
+          </Button>
         </div>
       </form>
     </div>

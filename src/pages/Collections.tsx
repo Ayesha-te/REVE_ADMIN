@@ -32,6 +32,7 @@ const Collections = () => {
   const [form, setForm] = useState<CollectionForm>(emptyForm);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   const loadCollections = async () => {
     try {
@@ -74,6 +75,7 @@ const Collections = () => {
   };
 
   const handleSave = async () => {
+    if (isSaving) return;
     if (!form.name.trim()) {
       toast.error('Collection name is required');
       return;
@@ -86,6 +88,7 @@ const Collections = () => {
       toast.error('Collection image is required');
       return;
     }
+    setIsSaving(true);
     const payload = {
       name: form.name.trim(),
       description: form.description.trim(),
@@ -105,6 +108,8 @@ const Collections = () => {
       await loadCollections();
     } catch (error) {
       toast.error('Failed to save collection');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -223,7 +228,7 @@ const Collections = () => {
           </div>
 
           <div className="flex items-center gap-3">
-            <Button onClick={handleSave}>
+            <Button onClick={handleSave} disabled={isSaving || isUploading}>
               {editingId ? 'Update Collection' : 'Create Collection'}
             </Button>
             {editingId && (
