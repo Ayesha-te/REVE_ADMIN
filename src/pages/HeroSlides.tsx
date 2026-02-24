@@ -4,13 +4,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Input } from '../components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { apiDelete, apiGet, apiPatch, apiPost, apiPut, apiUpload } from '../lib/api';
-import type { Category, HeroSlide } from '../lib/types';
+import type { Category, SubCategory, HeroSlide } from '../lib/types';
 import { toast } from 'sonner';
 
 type HeroSlideForm = {
   title: string;
   subtitle: string;
   category: number | null;
+  subcategory: number | null;
   cta_text: string;
   cta_link: string;
   image: string;
@@ -22,6 +23,7 @@ const emptyForm: HeroSlideForm = {
   title: '',
   subtitle: '',
   category: null,
+  subcategory: null,
   cta_text: 'Shop Now',
   cta_link: '',
   image: '',
@@ -32,6 +34,7 @@ const emptyForm: HeroSlideForm = {
 const HeroSlides = () => {
   const [slides, setSlides] = useState<HeroSlide[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [subcategories, setSubcategories] = useState<SubCategory[]>([]);
   const [form, setForm] = useState<HeroSlideForm>(emptyForm);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -68,6 +71,28 @@ const HeroSlides = () => {
     };
     loadCategories();
   }, []);
+
+  useEffect(() => {
+    const loadSubs = async () => {
+      if (!form.category) {
+        setSubcategories([]);
+        setForm((prev) => ({ ...prev, subcategory: null }));
+        return;
+      }
+      try {
+        const data = await apiGet<SubCategory[]>(`/subcategories/?category=${form.category}`);
+        setSubcategories(data);
+        // If the current subcategory isn't in this list, clear it
+        if (form.subcategory && !data.find((s) => s.id === form.subcategory)) {
+          setForm((prev) => ({ ...prev, subcategory: null }));
+        }
+      } catch {
+        setSubcategories([]);
+        setForm((prev) => ({ ...prev, subcategory: null }));
+      }
+    };
+    loadSubs();
+  }, [form.category]);
 
   const handleUpload = async (file: File) => {
     setIsUploading(true);
@@ -107,6 +132,7 @@ const HeroSlides = () => {
       title: form.title.trim(),
       subtitle: form.subtitle.trim(),
       category: form.category,
+      subcategory: form.subcategory,
       cta_text: form.cta_text.trim() || 'Shop Now',
       cta_link: form.cta_link.trim(),
       image: form.image.trim(),
@@ -137,6 +163,7 @@ const HeroSlides = () => {
       title: slide.title || '',
       subtitle: slide.subtitle || '',
       category: slide.category ?? null,
+      subcategory: slide.subcategory ?? null,
       cta_text: slide.cta_text || 'Shop Now',
       cta_link: slide.cta_link || '',
       image: slide.image || '',
@@ -240,6 +267,25 @@ const HeroSlides = () => {
               </p>
             </div>
             <div className="space-y-2">
+              <label className="text-sm font-medium text-espresso">Subcategory</label>
+              <select
+                value={form.subcategory ?? ''}
+                onChange={(e) =>
+                  setForm((prev) => ({ ...prev, subcategory: e.target.value ? Number(e.target.value) : null }))
+                }
+                className="w-full rounded-md border border-input bg-white px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                disabled={!form.category || subcategories.length === 0}
+              >
+                <option value="">No subcategory</option>
+                {subcategories.map((subcategory) => (
+                  <option key={subcategory.id} value={subcategory.id}>
+                    {subcategory.name}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-muted-foreground">Optional. CTA will use subcategory slug when set.</p>
+            </div>
+            <div className="space-y-2">
               <label className="text-sm font-medium text-espresso">CTA label</label>
               <Input
                 value={form.cta_text}
@@ -322,15 +368,16 @@ const HeroSlides = () => {
           ) : (
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead>Title</TableHead>
-                  <TableHead>CTA</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Updated</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
+              <TableRow>
+                <TableHead>Title</TableHead>
+                <TableHead>CTA</TableHead>
+                <TableHead>Category</TableHead>
+                <TableHead>Subcategory</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Updated</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
               <TableBody>
                 {sortedSlides.map((slide) => (
                   <TableRow key={slide.id ?? slide.title}>
@@ -349,6 +396,9 @@ const HeroSlides = () => {
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {slide.category_name || '—'}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {slide.subcategory_name || '—'}
                     </TableCell>
                     <TableCell>
                       <span

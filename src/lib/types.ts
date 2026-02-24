@@ -31,8 +31,11 @@ export interface HeroSlide {
   title: string;
   subtitle?: string;
   category?: number | null;
+  subcategory?: number | null;
   category_name?: string;
   category_slug?: string;
+  subcategory_name?: string;
+  subcategory_slug?: string;
   cta_text?: string;
   cta_link?: string;
   image: string;
