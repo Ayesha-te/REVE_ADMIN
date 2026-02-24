@@ -12,6 +12,7 @@ import Orders from './pages/Orders';
 import Reviews from './pages/Reviews';
 import Policies from './pages/Policies';
 import Settings from './pages/Settings';
+import HeroSlides from './pages/HeroSlides';
 import { Toaster } from 'sonner';
 
 function App() {
@@ -50,6 +51,7 @@ function App() {
           <Route path="/reviews" element={<Reviews />} />
           <Route path="/policies" element={<Policies />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/hero-slides" element={<HeroSlides />} />
         </Routes>
       </AdminLayout>
       <Toaster position="top-right" />

@@ -11,6 +11,7 @@ import {
   PlusCircle,
   Truck,
   Star,
+  Image,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 
@@ -19,6 +20,7 @@ const sidebarLinks = [
   { name: 'Products', href: '/products', icon: ShoppingBag },
   { name: 'Categories', href: '/categories', icon: Layers },
   { name: 'Collections', href: '/collections', icon: Folder },
+  { name: 'Hero Slider', href: '/hero-slides', icon: Image },
   { name: 'Orders', href: '/orders', icon: ShoppingCart },
   { name: 'Reviews', href: '/reviews', icon: Star },
   { name: 'Delivery & Returns', href: '/policies', icon: Truck },
